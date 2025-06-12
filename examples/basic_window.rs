@@ -36,10 +36,7 @@ fn main() -> Result<()> {
                         renderer.resize(*physical_size);
                     }
                     WindowEvent::RedrawRequested => {
-                        if let Err(e) = renderer.begin_frame() {
-                            log::error!("Failed to begin frame: {}", e);
-                            return;
-                        }
+                        renderer.begin_frame();
 
                         renderer.draw_rect(
                             Vec2::new(100.0, 100.0),       // position

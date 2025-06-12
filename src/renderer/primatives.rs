@@ -2,30 +2,23 @@ use glam::{Vec2, Vec4};
 
 #[derive(Debug, Clone)]
 pub enum RenderPrimative {
-    // A filled rectangle
     Rectangle {
         position: Vec2,
         size: Vec2,
         color: Vec4,
     },
-
-    // Text to be rendered
     Text {
         text: String,
         position: Vec2,
         color: Vec4,
         size: f32,
     },
-
-    // A line between two points
     Line {
         start: Vec2,
         end: Vec2,
         color: Vec4,
         width: f32,
     },
-
-    // A circle
     Circle {
         center: Vec2,
         radius: f32,
@@ -39,13 +32,16 @@ pub struct RectInstance {
     pub pos: [f32; 2],
     pub size: [f32; 2],
     pub color: [f32; 4],
+    pub z: f32,
+    pub _pad: f32,
 }
 
 impl RectInstance {
-    const ATTRS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    const ATTRS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
         0 => Float32x2,   // pos
         1 => Float32x2,   // size
-        2 => Float32x4    // color
+        2 => Float32x4,   // color
+        3 => Float32      // z
     ];
 
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
@@ -60,21 +56,22 @@ impl RectInstance {
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct LineInstance {
-    a: [f32; 2],
-    b: [f32; 2],
-    color: [f32; 4],
-    half_width: f32,
-    _pad: f32, // 16-byte alignment
+    pub a: [f32; 2],
+    pub b: [f32; 2],
+    pub color: [f32; 4],
+    pub half_width: f32,
+    _pad: f32,
+    pub z: f32,
 }
 
 impl LineInstance {
-    const ATTRS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+    const ATTRS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
         0 => Float32x2,   // a
         1 => Float32x2,   // b
         2 => Float32x4,   // color
-        3 => Float32      // half_width
+        3 => Float32,     // half_width
+        4 => Float32      // z
     ];
-
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as _,
@@ -87,20 +84,22 @@ impl LineInstance {
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CircleInstance {
-    center: [f32; 2],
-    radius: f32,
-    _pad: f32,
-    color: [f32; 4],
+    pub center: [f32; 2],
+    pub radius: f32,
+    _pad0: f32,
+    pub color: [f32; 4],
+    pub z: f32,
+    _pad1: f32,
 }
 
 impl CircleInstance {
-    const ATTRS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+    const ATTRS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
         0 => Float32x2,   // center
         1 => Float32,     // radius
         2 => Float32,     // pad
-        3 => Float32x4    // color
+        3 => Float32x4,   // color
+        4 => Float32      // z
     ];
-
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as _,
@@ -112,61 +111,60 @@ impl CircleInstance {
 
 impl From<&RenderPrimative> for RectInstance {
     fn from(p: &RenderPrimative) -> Self {
-        if let RenderPrimative::Rectangle {
-            position,
-            size,
-            color,
-        } = p
-        {
-            Self {
+        match p {
+            RenderPrimative::Rectangle {
+                position,
+                size,
+                color,
+            } => Self {
                 pos: position.to_array(),
                 size: size.to_array(),
                 color: color.to_array(),
-            }
-        } else {
-            unreachable!()
+                z: 0.0,
+                _pad: 0.0,
+            },
+            _ => unreachable!(),
         }
     }
 }
 
 impl From<&RenderPrimative> for LineInstance {
     fn from(p: &RenderPrimative) -> Self {
-        if let RenderPrimative::Line {
-            start,
-            end,
-            color,
-            width,
-        } = p
-        {
-            Self {
+        match p {
+            RenderPrimative::Line {
+                start,
+                end,
+                color,
+                width,
+            } => Self {
                 a: start.to_array(),
                 b: end.to_array(),
                 color: color.to_array(),
                 half_width: *width * 0.5,
                 _pad: 0.0,
-            }
-        } else {
-            unreachable!()
+                z: 0.0,
+            },
+            _ => unreachable!(),
         }
     }
 }
 
 impl From<&RenderPrimative> for CircleInstance {
     fn from(p: &RenderPrimative) -> Self {
-        if let RenderPrimative::Circle {
-            center,
-            radius,
-            color,
-        } = p
-        {
-            Self {
+        match p {
+            RenderPrimative::Circle {
+                center,
+                radius,
+                color,
+            } => Self {
                 center: center.to_array(),
                 radius: *radius,
-                _pad: 0.0,
+                _pad0: 0.0,
                 color: color.to_array(),
-            }
-        } else {
-            unreachable!()
+                z: 0.0,
+                _pad1: 0.0,
+            },
+            _ => unreachable!(),
         }
     }
 }

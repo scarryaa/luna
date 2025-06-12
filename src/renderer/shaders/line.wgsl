@@ -12,6 +12,7 @@ fn vs_main(
     @location(1) b      : vec2<f32>,
     @location(2) color  : vec4<f32>,
     @location(3) half_w : f32,
+    @location(4) z    : f32,
     @builtin(vertex_index) vertex_index : u32
 ) -> VertexOut {
     let x = select(0.0, 1.0, vertex_index == 1u || vertex_index == 2u || vertex_index == 4u);
@@ -33,8 +34,8 @@ fn vs_main(
     );
 
     var out: VertexOut;
-    out.pos = vec4<f32>(ndc, 0.0, 1.0);
     out.color = color;
+    out.pos = vec4<f32>(ndc, z, 1.0);
     return out;
 }
 

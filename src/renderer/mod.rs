@@ -12,14 +12,69 @@ pub use gpu::GpuContext;
 pub use primatives::{Primative, RenderPrimative};
 pub use surface::RenderSurface;
 
+const START_CAPACITY: usize = 4 * 1024;
+
+struct InstanceBuffer<T> {
+    buf: wgpu::Buffer,
+    capacity: usize,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T: bytemuck::Pod> InstanceBuffer<T> {
+    fn new(device: &wgpu::Device, usage: wgpu::BufferUsages) -> Self {
+        let buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("instance buf"),
+            size: (START_CAPACITY * std::mem::size_of::<T>()) as _,
+            usage,
+            mapped_at_creation: false,
+        });
+        Self {
+            buf,
+            capacity: START_CAPACITY,
+            _marker: Default::default(),
+        }
+    }
+
+    fn ensure_capacity(
+        &mut self,
+        device: &wgpu::Device,
+        required: usize,
+        usage: wgpu::BufferUsages,
+    ) {
+        if required <= self.capacity {
+            return;
+        }
+        // grow 2× until big enough
+        while self.capacity < required {
+            self.capacity *= 2;
+        }
+        self.buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("instance buf (grown)"),
+            size: (self.capacity * std::mem::size_of::<T>()) as _,
+            usage,
+            mapped_at_creation: false,
+        });
+    }
+
+    fn upload(&mut self, queue: &wgpu::Queue, data: &[T]) {
+        queue.write_buffer(&self.buf, 0, bytemuck::cast_slice(data));
+    }
+}
+
 pub struct Renderer<'a> {
     gpu: GpuContext,
     surface: RenderSurface<'a>,
+
     screen_buf: wgpu::Buffer,
     screen_bind: wgpu::BindGroup,
-    rect_pipeline: wgpu::RenderPipeline,
-    line_pipeline: wgpu::RenderPipeline,
-    circle_pipeline: wgpu::RenderPipeline,
+
+    rect_pipe: wgpu::RenderPipeline,
+    line_pipe: wgpu::RenderPipeline,
+    circle_pipe: wgpu::RenderPipeline,
+
+    rect_ibuf: InstanceBuffer<RectInstance>,
+    line_ibuf: InstanceBuffer<LineInstance>,
+    circle_ibuf: InstanceBuffer<CircleInstance>,
 
     rect_instances: Vec<RectInstance>,
     line_instances: Vec<LineInstance>,
@@ -33,10 +88,10 @@ pub struct Renderer<'a> {
 impl<'a> Renderer<'a> {
     pub async fn new(window: &'a winit::window::Window) -> crate::Result<Self> {
         use wgpu::util::DeviceExt;
+
         let gpu = GpuContext::new().await?;
         let surf = RenderSurface::new(&gpu, window)?;
         let size = window.inner_size();
-
         let surface_fmt = surf.format();
 
         let screen_buf = gpu
@@ -83,16 +138,14 @@ impl<'a> Renderer<'a> {
                 source: wgpu::ShaderSource::Wgsl(src.into()),
             });
 
-            // create pipeline layout
             let pipe_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("pipeline-layout"),
                 bind_group_layouts: &[bind_layout],
                 push_constant_ranges: &[],
             });
 
-            // assemble final pipeline
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(src),
+                label: Some(label),
                 layout: Some(&pipe_layout),
                 vertex: wgpu::VertexState {
                     module: &module,
@@ -145,19 +198,27 @@ impl<'a> Renderer<'a> {
         let font_system = FontSystem::new();
         let swash_cache = SwashCache::new();
 
+        let usage = wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST;
+        let rect_ibuf = InstanceBuffer::<RectInstance>::new(&gpu.device, usage);
+        let line_ibuf = InstanceBuffer::<LineInstance>::new(&gpu.device, usage);
+        let circle_ibuf = InstanceBuffer::<CircleInstance>::new(&gpu.device, usage);
+
         Ok(Self {
             gpu,
             surface: surf,
             screen_buf,
             screen_bind,
-            rect_pipeline,
-            line_pipeline,
-            circle_pipeline,
+            rect_pipe: rect_pipeline,
+            line_pipe: line_pipeline,
+            circle_pipe: circle_pipeline,
             rect_instances: Vec::new(),
             line_instances: Vec::new(),
             circle_instances: Vec::new(),
-            font_system: font_system,
-            swash_cache: swash_cache,
+            rect_ibuf,
+            line_ibuf,
+            circle_ibuf,
+            font_system,
+            swash_cache,
             text_prims: Vec::new(),
         })
     }
@@ -174,11 +235,11 @@ impl<'a> Renderer<'a> {
             .write_buffer(&self.screen_buf, 0, bytemuck::cast_slice(&data));
     }
 
-    pub fn begin_frame(&mut self) -> crate::Result<()> {
+    pub fn begin_frame(&mut self) {
         self.rect_instances.clear();
         self.line_instances.clear();
         self.circle_instances.clear();
-        Ok(())
+        self.text_prims.clear();
     }
 
     pub fn draw_primative(&mut self, prim: RenderPrimative) {
@@ -190,25 +251,11 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    pub fn draw_rect(&mut self, position: Vec2, size: Vec2, color: Vec4) {
-        let primative = RenderPrimative::Rectangle {
-            position,
-            size,
-            color,
-        };
-
-        self.draw_primative(primative);
+    pub fn draw_rect(&mut self, p: Vec2, s: Vec2, c: Vec4) {
+        self.draw_primative(RenderPrimative::rectangle(p, s, c))
     }
-
-    pub fn draw_text(&mut self, text: &str, position: Vec2, color: Vec4, size: f32) {
-        let primative = RenderPrimative::Text {
-            text: text.to_string(),
-            position,
-            color,
-            size,
-        };
-
-        self.draw_primative(primative);
+    pub fn draw_text(&mut self, t: &str, p: Vec2, c: Vec4, s: f32) {
+        self.draw_primative(RenderPrimative::text(t, p, c, s))
     }
 
     fn blit_text(
@@ -252,62 +299,53 @@ impl<'a> Renderer<'a> {
                     rgba.b() as f32 / 255.0,
                     rgba.a() as f32 / 255.0,
                 ],
+                z: 0.0,
+                _pad: 0.0,
             });
         });
     }
 
     pub fn end_frame(&mut self) -> crate::Result<()> {
-        use wgpu::util::DeviceExt;
-
-        let mut extra_rects = Vec::new();
-        for prim in &self.text_prims {
-            Self::blit_text(
-                prim,
-                &mut self.font_system,
-                &mut self.swash_cache,
-                &mut extra_rects,
-            );
+        /* ----- shape text into extra rects ----------------------------------- */
+        let mut extra = Vec::new();
+        for p in &self.text_prims {
+            Self::blit_text(p, &mut self.font_system, &mut self.swash_cache, &mut extra);
         }
-        self.rect_instances.extend(extra_rects);
+        self.rect_instances.extend(extra);
 
-        let rect_buf = self
-            .gpu
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("rect inst"),
-                contents: bytemuck::cast_slice(&self.rect_instances),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-        let line_buf = self
-            .gpu
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("line inst"),
-                contents: bytemuck::cast_slice(&self.line_instances),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-        let circle_buf = self
-            .gpu
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("circle inst"),
-                contents: bytemuck::cast_slice(&self.circle_instances),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        /* ----- sort by z if you start assigning layers ----------------------- */
+        self.rect_instances.sort_by(|a, b| a.z.total_cmp(&b.z));
+        self.line_instances.sort_by(|a, b| a.z.total_cmp(&b.z));
+        self.circle_instances.sort_by(|a, b| a.z.total_cmp(&b.z));
 
+        /* ----- grow / upload persistent buffers ------------------------------ */
+        let usage = wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST;
+        self.rect_ibuf
+            .ensure_capacity(&self.gpu.device, self.rect_instances.len(), usage);
+        self.line_ibuf
+            .ensure_capacity(&self.gpu.device, self.line_instances.len(), usage);
+        self.circle_ibuf
+            .ensure_capacity(&self.gpu.device, self.circle_instances.len(), usage);
+
+        self.rect_ibuf.upload(&self.gpu.queue, &self.rect_instances);
+        self.line_ibuf.upload(&self.gpu.queue, &self.line_instances);
+        self.circle_ibuf
+            .upload(&self.gpu.queue, &self.circle_instances);
+
+        /* ----- begin render pass --------------------------------------------- */
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
         let mut enc = self
             .gpu
             .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("encoder"),
-            });
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("enc") });
+
         {
             let mut rp = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("main pass"),
+                label: Some("main-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -328,19 +366,20 @@ impl<'a> Renderer<'a> {
 
             rp.set_bind_group(0, &self.screen_bind, &[]);
 
-            rp.set_pipeline(&self.rect_pipeline);
-            rp.set_vertex_buffer(0, rect_buf.slice(..));
+            rp.set_pipeline(&self.rect_pipe);
+            rp.set_vertex_buffer(0, self.rect_ibuf.buf.slice(..));
             rp.draw(0..6, 0..self.rect_instances.len() as _);
 
-            rp.set_pipeline(&self.line_pipeline);
-            rp.set_vertex_buffer(0, line_buf.slice(..));
+            rp.set_pipeline(&self.line_pipe);
+            rp.set_vertex_buffer(0, self.line_ibuf.buf.slice(..));
             rp.draw(0..6, 0..self.line_instances.len() as _);
 
-            rp.set_pipeline(&self.circle_pipeline);
-            rp.set_vertex_buffer(0, circle_buf.slice(..));
+            rp.set_pipeline(&self.circle_pipe);
+            rp.set_vertex_buffer(0, self.circle_ibuf.buf.slice(..));
             rp.draw(0..6, 0..self.circle_instances.len() as _);
         }
-        self.gpu.queue.submit(std::iter::once(enc.finish()));
+
+        self.gpu.queue.submit(Some(enc.finish()));
         output.present();
         Ok(())
     }
@@ -351,5 +390,20 @@ impl<'a> Renderer<'a> {
 
     pub fn queue(&self) -> &Queue {
         &self.gpu.queue
+    }
+
+    pub fn with_scissor<F: FnOnce(&mut wgpu::RenderPass)>(
+        rp: &mut wgpu::RenderPass,
+        rect: Option<(u32, u32, u32, u32)>,
+        target: winit::dpi::PhysicalSize<u32>,
+        f: F,
+    ) {
+        if let Some((x, y, w, h)) = rect {
+            rp.set_scissor_rect(x, y, w, h);
+            f(rp);
+            rp.set_scissor_rect(0, 0, target.width, target.height);
+        } else {
+            f(rp)
+        }
     }
 }

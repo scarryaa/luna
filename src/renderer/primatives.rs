@@ -1,0 +1,247 @@
+use glam::{Vec2, Vec4};
+
+#[derive(Debug, Clone)]
+pub enum RenderPrimative {
+    // A filled rectangle
+    Rectangle {
+        position: Vec2,
+        size: Vec2,
+        color: Vec4,
+    },
+
+    // Text to be rendered
+    Text {
+        text: String,
+        position: Vec2,
+        color: Vec4,
+        size: f32,
+    },
+
+    // A line between two points
+    Line {
+        start: Vec2,
+        end: Vec2,
+        color: Vec4,
+        width: f32,
+    },
+
+    // A circle
+    Circle {
+        center: Vec2,
+        radius: f32,
+        color: Vec4,
+    },
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct RectInstance {
+    pos: [f32; 2],
+    size: [f32; 2],
+    color: [f32; 4],
+}
+
+impl RectInstance {
+    const ATTRS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+        0 => Float32x2,   // pos
+        1 => Float32x2,   // size
+        2 => Float32x4    // color
+    ];
+
+    pub fn layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as _,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &Self::ATTRS,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct LineInstance {
+    a: [f32; 2],
+    b: [f32; 2],
+    color: [f32; 4],
+    half_width: f32,
+    _pad: f32, // 16-byte alignment
+}
+
+impl LineInstance {
+    const ATTRS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+        0 => Float32x2,   // a
+        1 => Float32x2,   // b
+        2 => Float32x4,   // color
+        3 => Float32      // half_width
+    ];
+
+    pub fn layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as _,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &Self::ATTRS,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CircleInstance {
+    center: [f32; 2],
+    radius: f32,
+    _pad: f32,
+    color: [f32; 4],
+}
+
+impl CircleInstance {
+    const ATTRS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+        0 => Float32x2,   // center
+        1 => Float32,     // radius
+        2 => Float32,     // pad
+        3 => Float32x4    // color
+    ];
+
+    pub fn layout() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as _,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &Self::ATTRS,
+        }
+    }
+}
+
+impl From<&RenderPrimative> for RectInstance {
+    fn from(p: &RenderPrimative) -> Self {
+        if let RenderPrimative::Rectangle {
+            position,
+            size,
+            color,
+        } = p
+        {
+            Self {
+                pos: position.to_array(),
+                size: size.to_array(),
+                color: color.to_array(),
+            }
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+impl From<&RenderPrimative> for LineInstance {
+    fn from(p: &RenderPrimative) -> Self {
+        if let RenderPrimative::Line {
+            start,
+            end,
+            color,
+            width,
+        } = p
+        {
+            Self {
+                a: start.to_array(),
+                b: end.to_array(),
+                color: color.to_array(),
+                half_width: *width * 0.5,
+                _pad: 0.0,
+            }
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+impl From<&RenderPrimative> for CircleInstance {
+    fn from(p: &RenderPrimative) -> Self {
+        if let RenderPrimative::Circle {
+            center,
+            radius,
+            color,
+        } = p
+        {
+            Self {
+                center: center.to_array(),
+                radius: *radius,
+                _pad: 0.0,
+                color: color.to_array(),
+            }
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+// Trait for objects that can be converted to render primatives
+pub trait Primative {
+    // Convert this object to render primatives
+    fn to_primatives(&self) -> Vec<RenderPrimative>;
+}
+
+impl Primative for RenderPrimative {
+    fn to_primatives(&self) -> Vec<RenderPrimative> {
+        vec![self.clone()]
+    }
+}
+
+impl RenderPrimative {
+    // Create a new rectangle primative
+    pub fn rectangle(position: Vec2, size: Vec2, color: Vec4) -> Self {
+        Self::Rectangle {
+            position,
+            size,
+            color,
+        }
+    }
+
+    // Create a new text primative
+    pub fn text(text: impl Into<String>, position: Vec2, color: Vec4, size: f32) -> Self {
+        Self::Text {
+            text: text.into(),
+            position,
+            color,
+            size,
+        }
+    }
+
+    // Create a new line primative
+    pub fn line(start: Vec2, end: Vec2, color: Vec4, width: f32) -> Self {
+        Self::Line {
+            start,
+            end,
+            color,
+            width,
+        }
+    }
+
+    // Create a new circle primative
+    pub fn circle(center: Vec2, radius: f32, color: Vec4) -> Self {
+        Self::Circle {
+            center,
+            radius,
+            color,
+        }
+    }
+
+    // Get the bounding box of this primative
+    pub fn bounding_box(&self) -> (Vec2, Vec2) {
+        match self {
+            Self::Rectangle { position, size, .. } => (*position, *position + *size),
+            Self::Text { position, size, .. } => {
+                // TODO measure w/font metrics
+                let text_size = Vec2::new(size * 0.6, *size);
+                (*position, *position + text_size)
+            }
+            Self::Line {
+                start, end, width, ..
+            } => {
+                let min = start.min(*end) - Vec2::splat(*width * 0.5);
+                let max = start.max(*end) + Vec2::splat(*width * 0.5);
+                (min, max)
+            }
+            Self::Circle { center, radius, .. } => {
+                let offset = Vec2::splat(*radius);
+                (*center - offset, *center + offset)
+            }
+        }
+    }
+}

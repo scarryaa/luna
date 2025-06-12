@@ -36,9 +36,9 @@ pub enum RenderPrimative {
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct RectInstance {
-    pos: [f32; 2],
-    size: [f32; 2],
-    color: [f32; 4],
+    pub pos: [f32; 2],
+    pub size: [f32; 2],
+    pub color: [f32; 4],
 }
 
 impl RectInstance {

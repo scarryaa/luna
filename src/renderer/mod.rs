@@ -2,6 +2,8 @@ pub mod gpu;
 pub mod primatives;
 pub mod surface;
 
+use cosmic_text::{Attrs, Color, Metrics, Shaping};
+use cosmic_text::{FontSystem, SwashCache};
 use glam::{Vec2, Vec4};
 use primatives::{CircleInstance, LineInstance, RectInstance};
 use wgpu::{Device, Queue, TextureFormat};
@@ -22,6 +24,10 @@ pub struct Renderer<'a> {
     rect_instances: Vec<RectInstance>,
     line_instances: Vec<LineInstance>,
     circle_instances: Vec<CircleInstance>,
+
+    font_system: FontSystem,
+    swash_cache: SwashCache,
+    text_prims: Vec<RenderPrimative>,
 }
 
 impl<'a> Renderer<'a> {
@@ -136,6 +142,9 @@ impl<'a> Renderer<'a> {
             surface_fmt,
         );
 
+        let font_system = FontSystem::new();
+        let swash_cache = SwashCache::new();
+
         Ok(Self {
             gpu,
             surface: surf,
@@ -147,6 +156,9 @@ impl<'a> Renderer<'a> {
             rect_instances: Vec::new(),
             line_instances: Vec::new(),
             circle_instances: Vec::new(),
+            font_system: font_system,
+            swash_cache: swash_cache,
+            text_prims: Vec::new(),
         })
     }
 
@@ -174,7 +186,7 @@ impl<'a> Renderer<'a> {
             RenderPrimative::Rectangle { .. } => self.rect_instances.push((&prim).into()),
             RenderPrimative::Line { .. } => self.line_instances.push((&prim).into()),
             RenderPrimative::Circle { .. } => self.circle_instances.push((&prim).into()),
-            RenderPrimative::Text { .. } => { /* text later */ }
+            RenderPrimative::Text { .. } => self.text_prims.push(prim),
         }
     }
 
@@ -199,8 +211,64 @@ impl<'a> Renderer<'a> {
         self.draw_primative(primative);
     }
 
+    fn blit_text(
+        prim: &RenderPrimative,
+        font_system: &mut FontSystem,
+        swash: &mut SwashCache,
+        out: &mut Vec<RectInstance>,
+    ) {
+        let RenderPrimative::Text {
+            text,
+            position,
+            color,
+            size,
+        } = prim
+        else {
+            return;
+        };
+
+        let metrics = Metrics::new(*size, size * 1.2);
+        let mut buf = cosmic_text::Buffer::new(font_system, metrics);
+        let mut buf = buf.borrow_with(font_system);
+
+        buf.set_text(text, &Attrs::new(), Shaping::Advanced);
+        buf.shape_until_scroll(true);
+
+        let fg = Color::rgba(
+            (color.x * 255.0) as u8,
+            (color.y * 255.0) as u8,
+            (color.z * 255.0) as u8,
+            (color.w * 255.0) as u8,
+        );
+
+        buf.draw(swash, fg, |x, y, w, h, rgba| {
+            let pos = *position + Vec2::new(x as f32, y as f32);
+            out.push(RectInstance {
+                pos: pos.to_array(),
+                size: [w as f32, h as f32],
+                color: [
+                    rgba.r() as f32 / 255.0,
+                    rgba.g() as f32 / 255.0,
+                    rgba.b() as f32 / 255.0,
+                    rgba.a() as f32 / 255.0,
+                ],
+            });
+        });
+    }
+
     pub fn end_frame(&mut self) -> crate::Result<()> {
         use wgpu::util::DeviceExt;
+
+        let mut extra_rects = Vec::new();
+        for prim in &self.text_prims {
+            Self::blit_text(
+                prim,
+                &mut self.font_system,
+                &mut self.swash_cache,
+                &mut extra_rects,
+            );
+        }
+        self.rect_instances.extend(extra_rects);
 
         let rect_buf = self
             .gpu

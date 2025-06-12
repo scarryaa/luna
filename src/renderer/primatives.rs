@@ -27,7 +27,7 @@ pub enum RenderPrimative {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct RectInstance {
     pub pos: [f32; 2],
     pub size: [f32; 2],
@@ -54,13 +54,13 @@ impl RectInstance {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct LineInstance {
     pub a: [f32; 2],
     pub b: [f32; 2],
     pub color: [f32; 4],
     pub half_width: f32,
-    _pad: f32,
+    pub _pad: f32,
     pub z: f32,
 }
 
@@ -82,14 +82,14 @@ impl LineInstance {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CircleInstance {
     pub center: [f32; 2],
     pub radius: f32,
-    _pad0: f32,
+    pub _pad0: f32,
     pub color: [f32; 4],
     pub z: f32,
-    _pad1: f32,
+    pub _pad1: f32,
 }
 
 impl CircleInstance {

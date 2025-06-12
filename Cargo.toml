@@ -18,8 +18,12 @@ log = "0.4.27"
 bytemuck = "1.23.1"
 
 [[example]]
-name = "basic_window"
-path = "examples/basic_window.rs"
+name = "immediate"
+path = "examples/immediate.rs"
+
+[[example]]
+name = "retained"
+path = "examples/retained.rs"
 
 [lib]
 name = "luna"

@@ -7,13 +7,13 @@ use winit::{
 
 fn main() -> Result<()> {
     luna::init_logging();
-    log::info!("Starting Nova UI basic window example");
+    log::info!("Starting Luna immediate mode example");
 
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
     let window = WindowBuilder::new()
-        .with_title("Basic Window")
+        .with_title("Immediate")
         .with_inner_size(winit::dpi::LogicalSize::new(800, 600))
         .build(&event_loop)?;
 

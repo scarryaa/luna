@@ -1,12 +1,9 @@
-use glam::Vec2;
-use winit::event::WindowEvent;
+use glam::{Vec2, vec2};
+use winit::event::{DeviceId, WindowEvent};
 
 use crate::{
-    layout::Rect,
-    renderer::{
-        RenderPrimative, Renderer,
-        primatives::{CircleInstance, LineInstance, RectInstance},
-    },
+    layout::{Dirty, Rect},
+    renderer::Renderer,
     widgets::{BuildCtx, Widget},
 };
 
@@ -19,11 +16,12 @@ pub enum PrimId {
 }
 
 pub struct Node {
-    prims: Vec<PrimId>,
     widget: Box<dyn Widget>,
     children: Vec<Node>,
-    layout: Rect,
-    dirty: bool,
+
+    layout_rect: Rect, // absolute rect in parent space
+    cached_size: Vec2, // result of last `measure`
+    dirty: Dirty,
 }
 
 impl Node {
@@ -35,110 +33,54 @@ impl Node {
             .collect();
 
         Self {
-            prims: Vec::new(),
             widget,
             children: kids,
-            layout,
-            dirty: true,
+
+            layout_rect: layout,
+            cached_size: layout.size,
+            dirty: Dirty {
+                self_dirty: true,
+                child_dirty: true,
+            },
         }
     }
 
-    #[inline]
-    pub fn mark_dirty(&mut self) {
-        self.dirty = true;
+    pub fn invalidate(&mut self) {
+        if !self.dirty.self_dirty {
+            self.dirty.self_dirty = true;
+        }
+    }
+
+    pub fn mark_child_dirty(&mut self) {
+        self.dirty.child_dirty = true;
+    }
+
+    pub fn layout(&mut self, max_width: f32) -> Vec2 {
+        if !self.dirty.self_dirty && !self.dirty.child_dirty {
+            return self.cached_size;
+        }
+
+        if self.dirty.self_dirty {
+            self.cached_size = self.widget.measure(max_width);
+        }
+
+        if self.dirty.self_dirty || self.dirty.child_dirty {
+            let mut y = 0.0;
+            for child in &mut self.children {
+                let sz = child.layout(self.cached_size.x);
+                child.layout_rect = Rect::new(self.layout_rect.origin + vec2(0.0, y), sz);
+                y += sz.y;
+            }
+        }
+
+        self.dirty.child_dirty = false;
+        self.cached_size
     }
 
     pub fn collect(&mut self, ren: &mut Renderer) {
-        if self.dirty {
-            let mut fresh = Vec::<RenderPrimative>::new();
-            self.widget.paint(self.layout, &mut fresh);
-
-            while self.prims.len() < fresh.len() {
-                let id = match fresh[self.prims.len()] {
-                    RenderPrimative::Rectangle { .. } => PrimId::Rect(ren.alloc_rect()),
-                    RenderPrimative::Line { .. } => PrimId::Line(ren.alloc_line()),
-                    RenderPrimative::Circle { .. } => PrimId::Circ(ren.alloc_circle()),
-                    RenderPrimative::Text { .. } => {
-                        PrimId::Text(ren.push_text(fresh[self.prims.len()].clone()))
-                    }
-                };
-                self.prims.push(id);
-            }
-
-            for (handle, prim) in self.prims.iter().zip(fresh.into_iter()) {
-                match (handle, prim) {
-                    (
-                        PrimId::Rect(idx),
-                        RenderPrimative::Rectangle {
-                            position,
-                            size,
-                            color,
-                        },
-                    ) => {
-                        ren.update_rect(
-                            *idx,
-                            RectInstance {
-                                pos: position.to_array(),
-                                size: size.to_array(),
-                                color: color.to_array(),
-                                z: 0.0,
-                                _pad: 0.0,
-                            },
-                        );
-                    }
-                    (
-                        PrimId::Line(idx),
-                        RenderPrimative::Line {
-                            start,
-                            end,
-                            color,
-                            width,
-                        },
-                    ) => {
-                        ren.update_line(
-                            *idx,
-                            LineInstance {
-                                a: start.to_array(),
-                                b: end.to_array(),
-                                color: color.to_array(),
-                                half_width: width * 0.5,
-                                _pad: 0.0,
-                                z: 0.0,
-                            },
-                        );
-                    }
-                    (
-                        PrimId::Circ(idx),
-                        RenderPrimative::Circle {
-                            center,
-                            radius,
-                            color,
-                        },
-                    ) => {
-                        ren.update_circle(
-                            *idx,
-                            CircleInstance {
-                                center: center.to_array(),
-                                radius,
-                                _pad0: 0.0,
-                                color: color.to_array(),
-                                z: 0.0,
-                                _pad1: 0.0,
-                            },
-                        );
-                    }
-                    (PrimId::Rect(idx), p @ RenderPrimative::Text { .. }) => {
-                        ren.update_rect(*idx, (&p).into());
-                    }
-
-                    (PrimId::Text(idx), p @ RenderPrimative::Text { .. }) => {
-                        ren.update_text(*idx, p);
-                    }
-                    _ => { /* type mismatch */ }
-                }
-            }
-
-            self.dirty = false;
+        if self.dirty.self_dirty || self.dirty.child_dirty {
+            self.widget.paint(self.layout_rect, ren);
+            self.dirty.self_dirty = false;
         }
 
         for child in &mut self.children {
@@ -151,31 +93,29 @@ impl Node {
             child.hit(pt, event);
         }
 
-        let inside_now = self.layout.contains(pt);
+        let inside = self.layout_rect.contains(pt);
 
         match event {
             WindowEvent::CursorMoved { .. } => {
-                if inside_now {
+                if inside {
                     self.widget.input(event);
-                    self.mark_dirty();
+                    self.invalidate();
                 } else {
                     let left = WindowEvent::CursorLeft {
-                        device_id: unsafe { winit::event::DeviceId::dummy() },
+                        device_id: unsafe { DeviceId::dummy() },
                     };
                     self.widget.input(&left);
-                    self.mark_dirty();
+                    self.invalidate();
                 }
             }
-
             WindowEvent::CursorLeft { .. } => {
                 self.widget.input(event);
-                self.mark_dirty();
+                self.invalidate();
             }
-
             _ => {
-                if inside_now && self.widget.hit_test(pt, self.layout) {
+                if inside && self.widget.hit_test(pt, self.layout_rect) {
                     self.widget.input(event);
-                    self.mark_dirty();
+                    self.invalidate();
                 }
             }
         }

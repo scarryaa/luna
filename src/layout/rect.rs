@@ -7,6 +7,10 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub fn new(origin: Vec2, size: Vec2) -> Self {
+        Self { origin, size }
+    }
+
     pub fn contains(&self, p: Vec2) -> bool {
         let min = self.origin;
         let max = self.origin + self.size;

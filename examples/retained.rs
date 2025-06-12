@@ -49,6 +49,8 @@ fn main() -> Result<()> {
         &mut ctx,
     );
 
+    let mut win_width = window.inner_size().width as f32;
+
     // Event / Render loop
     let _ = event_loop.run(|event, elwt| match event {
         Event::WindowEvent {
@@ -57,6 +59,7 @@ fn main() -> Result<()> {
         } if window_id == window.id() => {
             renderer.begin_frame();
 
+            root.layout(win_width);
             root.collect(&mut renderer);
 
             if let Err(e) = renderer.end_frame() {
@@ -68,7 +71,10 @@ fn main() -> Result<()> {
             ref event,
         } if window_id == window.id() => match event {
             WindowEvent::CloseRequested => elwt.exit(),
-            WindowEvent::Resized(sz) => renderer.resize(*sz),
+            WindowEvent::Resized(sz) => {
+                win_width = sz.width as f32;
+                renderer.resize(*sz);
+            }
             WindowEvent::MouseInput { .. }
             | WindowEvent::CursorMoved { .. }
             | WindowEvent::CursorLeft { .. } => {

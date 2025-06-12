@@ -1,5 +1,5 @@
 use super::BuildCtx;
-use crate::{layout::Rect, renderer::RenderPrimative};
+use crate::{Renderer, layout::Rect};
 use glam::Vec2;
 use winit::event::WindowEvent;
 
@@ -8,7 +8,9 @@ pub trait Widget: WidgetClone {
         Vec::new()
     }
 
-    fn paint(&self, layout: Rect, out: &mut Vec<RenderPrimative>);
+    fn measure(&self, max_width: f32) -> Vec2;
+
+    fn paint(&self, layout: Rect, ren: &mut Renderer);
 
     fn hit_test(&self, _pt: Vec2, _layout: Rect) -> bool {
         false
@@ -21,10 +23,7 @@ pub trait WidgetClone {
     fn box_clone(&self) -> Box<dyn Widget>;
 }
 
-impl<T> WidgetClone for T
-where
-    T: Widget + Clone + 'static,
-{
+impl<T: Widget + Clone + 'static> WidgetClone for T {
     fn box_clone(&self) -> Box<dyn Widget> {
         Box::new(self.clone())
     }

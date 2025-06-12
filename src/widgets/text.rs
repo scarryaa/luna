@@ -1,6 +1,6 @@
-use glam::Vec4;
+use glam::{Vec2, Vec4, vec2};
 
-use crate::{layout::Rect, renderer::RenderPrimative};
+use crate::{Renderer, layout::Rect};
 
 use super::base::Widget;
 
@@ -12,12 +12,12 @@ pub struct Text {
 }
 
 impl Widget for Text {
-    fn paint(&self, layout: Rect, out: &mut Vec<RenderPrimative>) {
-        out.push(RenderPrimative::text(
-            &self.content,
-            layout.origin,
-            self.color,
-            self.size,
-        ));
+    fn measure(&self, _max_width: f32) -> Vec2 {
+        // very rough: average glyph width ≈ 0.6 × font size
+        vec2(self.content.len() as f32 * self.size * 0.6, self.size)
+    }
+
+    fn paint(&self, layout: Rect, ren: &mut Renderer) {
+        ren.draw_text(&self.content, layout.origin, self.color, self.size);
     }
 }

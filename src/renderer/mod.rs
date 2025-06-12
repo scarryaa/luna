@@ -489,9 +489,9 @@ impl<'a> Renderer<'a> {
         if self.text_call_idx == self.frame_text_slots.len() {
             let prim = RenderPrimative::text(text, pos, color, size);
             let id = self.push_text(prim.clone());
-            self.text_slots.push(id);
             self.frame_text_slots.push(id);
         }
+
         let id = self.frame_text_slots[self.text_call_idx];
         self.text_call_idx += 1;
 

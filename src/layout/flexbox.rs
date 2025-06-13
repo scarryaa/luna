@@ -15,12 +15,8 @@ pub fn compute(
 ) -> Vec2 {
     let (mut main_used, mut cross_max): (f32, f32) = (0.0, 0.0);
 
-    for n in children.iter_mut() {
-        let sz = n.layout(if dir == FlexDir::Row {
-            f32::INFINITY
-        } else {
-            avail.x
-        });
+    for n in children.iter() {
+        let sz = n.cached();
         main_used += if dir == FlexDir::Row { sz.x } else { sz.y };
         cross_max = cross_max.max(if dir == FlexDir::Row { sz.y } else { sz.x });
     }
@@ -50,24 +46,44 @@ pub fn compute(
     let mut cursor = offset;
     for n in children.iter_mut() {
         let extra = grow_unit * n.style().flex_grow;
-        let size = if dir == FlexDir::Row {
-            vec2(
-                n.cached().x + extra,
+        let child_size = n.cached();
+
+        let (pos, size) = if dir == FlexDir::Row {
+            let cross_avail = avail.y;
+            let cross_offset = match align {
+                Align::Center => (cross_avail - child_size.y).max(0.0) / 2.0,
+                Align::End => (cross_avail - child_size.y).max(0.0),
+                _ => 0.0,
+            };
+            let p = content_origin + vec2(cursor, cross_offset);
+            let s = vec2(
+                child_size.x + extra,
                 if align == Align::Stretch {
                     cross_max
                 } else {
-                    n.cached().y
+                    child_size.y
                 },
-            )
+            );
+            (p, s)
         } else {
-            vec2(cross_max, n.cached().y + extra)
-        };
-        let pos = content_origin
-            + if dir == FlexDir::Row {
-                vec2(cursor, 0.0)
-            } else {
-                vec2(0.0, cursor)
+            let cross_avail = avail.x;
+            let cross_offset = match align {
+                Align::Center => (cross_avail - child_size.x).max(0.0) / 2.0,
+                Align::End => (cross_avail - child_size.x).max(0.0),
+                _ => 0.0,
             };
+            let p = content_origin + vec2(cross_offset, cursor);
+            let s = vec2(
+                if align == Align::Stretch {
+                    cross_max
+                } else {
+                    child_size.x
+                },
+                child_size.y + extra,
+            );
+            (p, s)
+        };
+
         n.set_rect(Rect::new(pos, size));
         cursor += if dir == FlexDir::Row { size.x } else { size.y } + gap;
     }

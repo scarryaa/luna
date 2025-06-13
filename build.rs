@@ -39,6 +39,7 @@ struct Colors {
     primary: String,
     primary_hover: String,
     text: String,
+    surface: String,
     danger: String,
 }
 
@@ -75,6 +76,10 @@ fn render_rust(raw: &RawTokens) -> String {
     s.push_str(&format!(
         "    pub const PRIMARY_HOVER: [f32;4] = {};\n",
         hex_to_vec4_literal(&raw.color.primary_hover)
+    ));
+    s.push_str(&format!(
+        "    pub const SURFACE:       [f32;4] = {};\n",
+        hex_to_vec4_literal(&raw.color.surface)
     ));
     s.push_str(&format!(
         "    pub const TEXT:          [f32;4] = {};\n",

@@ -17,7 +17,8 @@ fn main() -> Result<()> {
         .with_inner_size(winit::dpi::LogicalSize::new(800, 600))
         .build(&event_loop)?;
 
-    let mut renderer = pollster::block_on(luna::Renderer::new(&window))?;
+    let mut renderer =
+        pollster::block_on(luna::Renderer::new(&window, window.scale_factor() as f32))?;
 
     // Main event loop
     let _ = event_loop.run(|event, elwt| {

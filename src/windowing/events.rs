@@ -1,5 +1,5 @@
 use glam::Vec2;
-use winit::{event::MouseButton, keyboard::KeyCode};
+use winit::{event::MouseButton, keyboard::Key};
 
 #[derive(Clone, Debug)]
 pub enum EventKind {
@@ -9,8 +9,8 @@ pub enum EventKind {
     PointerLeave,
     Wheel { delta: Vec2 },
 
-    KeyDown { key: KeyCode },
-    KeyUp { key: KeyCode },
+    KeyDown { key: Key },
+    KeyUp { key: Key },
     CharInput { ch: char },
 
     FocusIn,
@@ -72,22 +72,32 @@ impl<'a> EventCtx<'a> {
 #[derive(Default)]
 pub struct FocusManager {
     focused_path: Vec<usize>,
+    change_request: Option<Vec<usize>>,
 }
 
 impl FocusManager {
     pub fn request_focus(&mut self, path: &[usize]) {
-        self.focused_path = path.to_vec();
+        self.change_request = Some(path.to_vec());
     }
 
     pub fn blur(&mut self) {
-        self.focused_path.clear();
+        self.change_request = Some(Vec::new());
     }
 
     pub fn path(&self) -> &[usize] {
         &self.focused_path
     }
 
+    #[allow(dead_code)]
     pub fn has_focus(&self, path: &[usize]) -> bool {
         path == self.focused_path
+    }
+
+    pub(crate) fn take_change_request(&mut self) -> Option<Vec<usize>> {
+        self.change_request.take()
+    }
+
+    pub(crate) fn commit_focus_change(&mut self, new_path: Vec<usize>) {
+        self.focused_path = new_path;
     }
 }

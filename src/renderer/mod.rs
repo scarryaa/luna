@@ -5,6 +5,7 @@ pub mod surface;
 use cosmic_text::{Attrs, Color, FontSystem, Metrics, Shaping, SwashCache};
 use glam::{Vec2, Vec4};
 use primatives::{CircleInstance, LineInstance, RectInstance};
+use wgpu::util::DeviceExt;
 use wgpu::{Device, Queue, TextureFormat};
 
 use crate::layout::Rect;
@@ -20,7 +21,7 @@ struct InstanceBuffer<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: bytemuck::Pod> InstanceBuffer<T> {
+impl<T: bytemuck::Pod + bytemuck::Zeroable> InstanceBuffer<T> {
     fn new(device: &wgpu::Device, usage: wgpu::BufferUsages) -> Self {
         let buf = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("instance-buf"),
@@ -38,22 +39,40 @@ impl<T: bytemuck::Pod> InstanceBuffer<T> {
     fn ensure_capacity(
         &mut self,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         required: usize,
         usage: wgpu::BufferUsages,
+        _pool: &[T],
     ) {
         if required <= self.capacity {
             return;
         }
-        // grow ×2 until big enough
+
+        let old_capacity = self.capacity;
         while self.capacity < required {
             self.capacity *= 2;
         }
-        self.buf = device.create_buffer(&wgpu::BufferDescriptor {
+
+        let new_buf = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("instance-buf (grown)"),
             size: (self.capacity * std::mem::size_of::<T>()) as _,
             usage,
             mapped_at_creation: false,
         });
+
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("buffer-copy-enc"),
+        });
+        encoder.copy_buffer_to_buffer(
+            &self.buf,
+            0,
+            &new_buf,
+            0,
+            (old_capacity * std::mem::size_of::<T>()) as wgpu::BufferAddress,
+        );
+        queue.submit(Some(encoder.finish()));
+
+        self.buf = new_buf;
     }
 
     fn upload_one(&mut self, queue: &wgpu::Queue, index: usize, val: &T) {
@@ -105,12 +124,12 @@ pub struct Renderer<'a> {
     text_call_idx: usize,
 
     scissor_stack: Vec<Rect>,
+    scale_factor: f32,
 }
 
 impl<'a> Renderer<'a> {
-    pub async fn new(window: &'a winit::window::Window) -> crate::Result<Self> {
+    pub async fn new(window: &'a winit::window::Window, scale_factor: f32) -> crate::Result<Self> {
         use primatives::{CircleInstance, LineInstance, RectInstance};
-        use wgpu::util::DeviceExt;
 
         let gpu = GpuContext::new().await?;
         let surf = RenderSurface::new(&gpu, window)?;
@@ -214,7 +233,9 @@ impl<'a> Renderer<'a> {
             surface_fmt,
         );
 
-        let usage = wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST;
+        let usage = wgpu::BufferUsages::VERTEX
+            | wgpu::BufferUsages::COPY_DST
+            | wgpu::BufferUsages::COPY_SRC;
         let rect_ibuf = InstanceBuffer::<RectInstance>::new(&gpu.device, usage);
         let line_ibuf = InstanceBuffer::<LineInstance>::new(&gpu.device, usage);
         let circle_ibuf = InstanceBuffer::<CircleInstance>::new(&gpu.device, usage);
@@ -253,7 +274,12 @@ impl<'a> Renderer<'a> {
             text_call_idx: 0,
 
             scissor_stack: Vec::new(),
+            scale_factor,
         })
+    }
+
+    pub fn set_scale_factor(&mut self, new_factor: f32) {
+        self.scale_factor = new_factor;
     }
 
     pub fn push_text(&mut self, p: RenderPrimative) -> usize {
@@ -430,13 +456,31 @@ impl<'a> Renderer<'a> {
             text_data.is_dirty = false;
         }
 
-        let usage = wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST;
-        self.rect_ibuf
-            .ensure_capacity(&self.gpu.device, self.rect_pool.len(), usage);
-        self.line_ibuf
-            .ensure_capacity(&self.gpu.device, self.line_pool.len(), usage);
-        self.circle_ibuf
-            .ensure_capacity(&self.gpu.device, self.circ_pool.len(), usage);
+        let usage = wgpu::BufferUsages::VERTEX
+            | wgpu::BufferUsages::COPY_DST
+            | wgpu::BufferUsages::COPY_SRC;
+
+        self.rect_ibuf.ensure_capacity(
+            &self.gpu.device,
+            &self.gpu.queue,
+            self.rect_pool.len(),
+            usage,
+            &self.rect_pool,
+        );
+        self.line_ibuf.ensure_capacity(
+            &self.gpu.device,
+            &self.gpu.queue,
+            self.line_pool.len(),
+            usage,
+            &self.line_pool,
+        );
+        self.circle_ibuf.ensure_capacity(
+            &self.gpu.device,
+            &self.gpu.queue,
+            self.circ_pool.len(),
+            usage,
+            &self.circ_pool,
+        );
 
         for (idx, inst) in self.rect_dirty.drain(..) {
             self.rect_ibuf.upload_one(&self.gpu.queue, idx, &inst);
@@ -482,15 +526,21 @@ impl<'a> Renderer<'a> {
             });
 
             let size = self.surface.size();
-            let full_rect = Rect::new(Vec2::ZERO, Vec2::new(size.width as f32, size.height as f32));
-            let r = self.scissor_stack.last().unwrap_or(&full_rect);
+            let full_rect = Rect::new(
+                Vec2::ZERO,
+                glam::vec2(size.width as f32, size.height as f32),
+            );
+            let logical_rect = self.scissor_stack.last().unwrap_or(&full_rect);
 
-            let scale_factor = self.surface.scale_factor();
-            let x = (r.origin.x * scale_factor) as u32;
-            let y = (r.origin.y * scale_factor) as u32;
-            let w = (r.size.x * scale_factor) as u32;
-            let h = (r.size.y * scale_factor) as u32;
-            rp.set_scissor_rect(x, y, w, h);
+            let physical_x = (logical_rect.origin.x * self.scale_factor).round() as u32;
+            let physical_y = (logical_rect.origin.y * self.scale_factor).round() as u32;
+            let physical_w = (logical_rect.size.x * self.scale_factor).round() as u32;
+            let physical_h = (logical_rect.size.y * self.scale_factor).round() as u32;
+
+            let physical_w = physical_w.min(size.width.saturating_sub(physical_x));
+            let physical_h = physical_h.min(size.height.saturating_sub(physical_y));
+
+            rp.set_scissor_rect(physical_x, physical_y, physical_w, physical_h);
 
             rp.set_bind_group(0, &self.screen_bind, &[]);
 
@@ -571,6 +621,7 @@ impl<'a> Renderer<'a> {
     pub fn device(&self) -> &Device {
         &self.gpu.device
     }
+
     pub fn queue(&self) -> &Queue {
         &self.gpu.queue
     }

@@ -1,8 +1,9 @@
 color:
-  primary:   "#4C76FF"
+  primary:       "#4C76FF"
   primary_hover: "#345EFF"
-  text:      "#FAFAFA"
-  danger:    "#E14B50"
+  text:          "#FAFAFA"
+  surface:       "#2B2B2B"
+  danger:        "#E14B50"
 spacing:
   xs: 2
   sm: 4
@@ -10,9 +11,9 @@ spacing:
   lg: 16
 radius:
   xs: 0
-  sm:   2
-  md:   4
-  lg:   8
+  sm: 2
+  md: 4
+  lg: 8
 font:
   family: "Inter"
   size:

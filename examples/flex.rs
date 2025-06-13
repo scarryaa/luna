@@ -61,7 +61,8 @@ fn main() -> luna::Result<()> {
     );
 
     let cloned_window = window.clone();
-    let mut renderer = pollster::block_on(Renderer::new(&cloned_window))?;
+    let mut renderer =
+        pollster::block_on(Renderer::new(&cloned_window, window.scale_factor() as f32))?;
 
     let btn = |txt| Box::new(Button::label(txt)) as Box<dyn Widget>;
     let row = FlexRow {
@@ -120,7 +121,7 @@ fn main() -> luna::Result<()> {
                 }
                 _ => {}
             }
-            root.route_window_event(w_event, &mut focus_manager);
+            root.route_window_event(w_event, &mut focus_manager, window.scale_factor());
 
             window.request_redraw();
         }

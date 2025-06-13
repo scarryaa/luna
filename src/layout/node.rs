@@ -1,12 +1,7 @@
 use glam::{Vec2, vec2};
-use winit::event::{ElementState, MouseScrollDelta};
-use winit::{
-    event::{Ime, WindowEvent},
-    keyboard::PhysicalKey,
-};
+use winit::event::{ElementState, Ime, MouseScrollDelta, WindowEvent};
 
 use crate::{
-    dbg_ev,
     layout::{Dirty, Rect},
     renderer::Renderer,
     style::Display,
@@ -72,14 +67,19 @@ impl Node {
         }
 
         let style = self.widget.style();
-        let avail = vec2(max_width, f32::INFINITY) - style.padding_total();
+        let avail = vec2(max_width, self.layout_rect.size.y) - style.padding_total();
+
+        for child in &mut self.children {
+            child.layout(avail.x);
+        }
+
         let content_origin = self.layout_rect.origin + style.padding_tl();
 
         match style.display {
             Display::Block => {
                 let mut y = style.padding.y;
                 for child in &mut self.children {
-                    let sz = child.layout(avail.x);
+                    let sz = child.cached();
                     let new_rect =
                         Rect::new(self.layout_rect.origin + vec2(style.padding.x, y), sz);
                     child.set_rect(new_rect);
@@ -188,10 +188,17 @@ impl Node {
         }
     }
 
-    pub fn route_window_event(&mut self, event: &WindowEvent, focus: &mut FocusManager) {
+    pub fn route_window_event(
+        &mut self,
+        event: &WindowEvent,
+        focus: &mut FocusManager,
+        scale_factor: f64,
+    ) {
         match *event {
             WindowEvent::CursorMoved { position, .. } => {
-                let pos = glam::vec2(position.x as f32, position.y as f32);
+                let logical_pos: winit::dpi::LogicalPosition<f32> =
+                    position.to_logical(scale_factor);
+                let pos = glam::vec2(logical_pos.x, logical_pos.y);
                 self.handle_pointer_move(pos, focus);
             }
 
@@ -236,23 +243,29 @@ impl Node {
                 event: ref key_ev, ..
             } => {
                 let focused_path = focus.path().to_vec();
-                if focused_path.is_empty() {
+                if focused_path.is_empty() && key_ev.text.is_none() {
                     return;
                 }
 
-                if let PhysicalKey::Code(key) = key_ev.physical_key {
-                    let kind = match key_ev.state {
-                        ElementState::Pressed => EventKind::KeyDown { key },
-                        ElementState::Released => EventKind::KeyUp { key },
-                    };
-                    Self::send_to_path(self, &focused_path, kind, focus);
-                }
+                let kind = match key_ev.state {
+                    ElementState::Pressed => EventKind::KeyDown {
+                        key: key_ev.logical_key.clone(),
+                    },
+                    ElementState::Released => EventKind::KeyUp {
+                        key: key_ev.logical_key.clone(),
+                    },
+                };
+                Self::send_to_path(self, &focused_path, kind, focus);
 
                 if let Some(text) = &key_ev.text {
                     if let Some(ch) = text.chars().next() {
                         Self::send_to_path(self, &focused_path, EventKind::CharInput { ch }, focus);
                     }
                 }
+            }
+
+            WindowEvent::Focused(false) => {
+                focus.blur();
             }
 
             WindowEvent::Ime(Ime::Preedit(ref s, _)) if !s.is_empty() => {
@@ -266,6 +279,19 @@ impl Node {
             }
 
             _ => {}
+        }
+
+        if let Some(new_path) = focus.take_change_request() {
+            let old_path = focus.path().to_vec();
+            if new_path != old_path {
+                if !old_path.is_empty() {
+                    Self::send_to_path(self, &old_path, EventKind::FocusOut, focus);
+                }
+                if !new_path.is_empty() {
+                    Self::send_to_path(self, &new_path, EventKind::FocusIn, focus);
+                }
+                focus.commit_focus_change(new_path);
+            }
         }
     }
 

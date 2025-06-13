@@ -5,6 +5,7 @@ pub mod column;
 pub mod prim_id;
 pub mod scrollable;
 pub mod text;
+pub mod text_input;
 
 pub use base::Widget;
 pub use build_context::BuildCtx;
@@ -13,3 +14,4 @@ pub use column::Column;
 pub use prim_id::PrimId;
 pub use scrollable::Scrollable;
 pub use text::Text;
+pub use text_input::TextInput;

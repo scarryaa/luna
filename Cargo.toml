@@ -43,6 +43,10 @@ path = "examples/grid.rs"
 name = "scrollable"
 path = "examples/scrollable.rs"
 
+[[example]]
+name = "text_input"
+path = "examples/text_input.rs"
+
 [lib]
 name = "luna"
 path = "src/lib.rs"

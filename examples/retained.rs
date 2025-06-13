@@ -28,7 +28,8 @@ fn main() -> Result<()> {
     );
 
     let cloned_window = window.clone();
-    let mut renderer = pollster::block_on(Renderer::new(&cloned_window))?;
+    let mut renderer =
+        pollster::block_on(Renderer::new(&cloned_window, window.scale_factor() as f32))?;
 
     let button = Button::label("Click").on_click(|| log::info!("clicked!"));
 
@@ -75,7 +76,7 @@ fn main() -> Result<()> {
 
                 _ => {}
             }
-            root.route_window_event(event, &mut focus_mgr);
+            root.route_window_event(event, &mut focus_mgr, window.scale_factor());
         }
 
         Event::AboutToWait => window.request_redraw(),

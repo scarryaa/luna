@@ -78,7 +78,8 @@ fn main() -> luna::Result<()> {
     window.request_redraw();
 
     let cloned_window = window.clone();
-    let mut renderer = pollster::block_on(Renderer::new(&cloned_window))?;
+    let mut renderer =
+        pollster::block_on(Renderer::new(&cloned_window, window.scale_factor() as f32))?;
     let make_btn = |i| Box::new(Button::label(&format!("Btn {i}"))) as Box<dyn Widget>;
     let grid = Grid::new(3, (1..10).map(make_btn).collect());
 
@@ -123,7 +124,7 @@ fn main() -> luna::Result<()> {
                 _ => {}
             }
 
-            root.route_window_event(event, &mut focus_manager);
+            root.route_window_event(event, &mut focus_manager, window.scale_factor());
             window.request_redraw();
         }
         _ => {}

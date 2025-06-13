@@ -21,7 +21,8 @@ fn main() -> Result<()> {
     );
     let cloned_window = window.clone();
 
-    let mut renderer = pollster::block_on(Renderer::new(&cloned_window))?;
+    let mut renderer =
+        pollster::block_on(Renderer::new(&cloned_window, window.scale_factor() as f32))?;
 
     let many_buttons: Vec<Box<dyn Widget>> = (0..100)
         .map(|i| Box::new(Button::label(format!("Button #{i}"))) as Box<dyn Widget>)
@@ -63,7 +64,7 @@ fn main() -> Result<()> {
                 window.request_redraw();
             }
             _ => {
-                root.route_window_event(event, &mut focus_manager);
+                root.route_window_event(event, &mut focus_manager, window.scale_factor());
                 window.request_redraw();
             }
         },

@@ -39,6 +39,10 @@ path = "examples/flex.rs"
 name = "grid"
 path = "examples/grid.rs"
 
+[[example]]
+name = "scrollable"
+path = "examples/scrollable.rs"
+
 [lib]
 name = "luna"
 path = "src/lib.rs"

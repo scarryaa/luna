@@ -1,5 +1,6 @@
 use glam::{Vec2, vec2};
 
+use crate::layout::node::Node;
 use crate::style::tokens::Spacing;
 use crate::{Renderer, layout::Rect};
 
@@ -40,7 +41,11 @@ impl Widget for Column {
         vec2(w, h)
     }
 
-    fn paint(&mut self, _layout: Rect, _ren: &mut Renderer) {}
+    fn paint(&mut self, children: &mut [Node], _layout: Rect, _ren: &mut Renderer) {
+        for child in children {
+            child.collect(_ren);
+        }
+    }
 }
 
 impl Clone for Column {

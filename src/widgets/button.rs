@@ -7,7 +7,7 @@ use winit::event::{ElementState, MouseButton, WindowEvent};
 use super::base::Widget;
 use crate::{
     Renderer,
-    layout::Rect,
+    layout::{Rect, node::Node},
     renderer::{RectId, RenderPrimative, primatives::RectInstance},
     style::tokens::{Colour, Radius, Spacing, Typography},
     windowing::events::{EventCtx, EventKind, Phase},
@@ -48,7 +48,7 @@ impl Widget for Button {
         )
     }
 
-    fn paint(&mut self, layout: Rect, ren: &mut Renderer) {
+    fn paint(&mut self, _children: &mut [Node], layout: Rect, ren: &mut Renderer) {
         let bg_color = if self.hovered {
             Vec4::from(Colour::PRIMARY_HOVER)
         } else {

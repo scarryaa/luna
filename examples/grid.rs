@@ -47,7 +47,16 @@ impl Widget for Grid {
         Vec2::ZERO
     }
 
-    fn paint(&mut self, _rect: Rect, _ren: &mut Renderer) {}
+    fn paint(
+        &mut self,
+        children: &mut [luna::layout::node::Node],
+        _rect: Rect,
+        _ren: &mut Renderer,
+    ) {
+        for child in children {
+            child.collect(_ren);
+        }
+    }
 
     fn style(&self) -> Style {
         self.style

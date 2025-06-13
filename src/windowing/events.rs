@@ -28,11 +28,17 @@ pub struct EventCtx<'a> {
     pub phase: Phase,
     pub focus: &'a mut FocusManager,
     pub path: &'a [usize],
+    pub node_layout: crate::layout::Rect,
     stopped: bool,
     default_prevented: bool,
+    pub layout_requested: bool,
 }
 
 impl<'a> EventCtx<'a> {
+    pub fn request_layout(&mut self) {
+        self.layout_requested = true;
+    }
+
     pub fn stop_propagation(&mut self) {
         self.stopped = true;
     }
@@ -45,13 +51,20 @@ impl<'a> EventCtx<'a> {
         self.stopped
     }
 
-    pub fn new(phase: Phase, focus: &'a mut FocusManager, path: &'a [usize]) -> Self {
+    pub fn new(
+        phase: Phase,
+        focus: &'a mut FocusManager,
+        path: &'a [usize],
+        node_layout: crate::layout::Rect,
+    ) -> Self {
         Self {
             phase,
             focus,
             path,
+            node_layout,
             stopped: false,
             default_prevented: false,
+            layout_requested: false,
         }
     }
 }

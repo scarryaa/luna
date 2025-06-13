@@ -34,6 +34,15 @@ impl<'window> RenderSurface<'window> {
         Ok(Self { surface, config })
     }
 
+    pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
+        winit::dpi::PhysicalSize::new(self.config.width, self.config.height)
+    }
+
+    pub fn scale_factor(&self) -> f32 {
+        // TODO get from window
+        1.0
+    }
+
     pub fn format(&self) -> TextureFormat {
         self.config.format
     }

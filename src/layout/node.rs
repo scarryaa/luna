@@ -116,12 +116,8 @@ impl Node {
 
     pub fn collect(&mut self, ren: &mut Renderer) {
         if self.dirty.paint_dirty {
-            self.widget.paint(self.layout_rect, ren);
+            self.widget.paint(&mut self.children, self.layout_rect, ren);
             self.dirty.paint_dirty = false;
-        }
-
-        for child in &mut self.children {
-            child.collect(ren);
         }
     }
 
@@ -156,29 +152,34 @@ impl Node {
             dbg_ev!(ev),
         );
 
+        let handle_event = |node: &mut Node, ctx: &mut EventCtx| {
+            ctx.node_layout = node.layout_rect;
+            node.widget.event(ctx, ev);
+
+            if ctx.layout_requested {
+                node.mark_dirty();
+            }
+            node.invalidate();
+        };
         let is_target = depth == path.len();
 
         match phase {
             Phase::Capture => {
-                self.widget.event(ctx, ev);
-                self.invalidate();
+                handle_event(self, ctx);
                 if ctx.is_stopped() || is_target {
                     return;
                 }
                 let idx = path[depth];
                 self.children[idx].dispatch(path, depth + 1, phase, ev, ctx);
             }
-
             Phase::Target => {
                 if is_target {
-                    self.widget.event(ctx, ev);
-                    self.invalidate();
+                    handle_event(self, ctx);
                 } else {
                     let idx = path[depth];
                     self.children[idx].dispatch(path, depth + 1, phase, ev, ctx);
                 }
             }
-
             Phase::Bubble => {
                 if !is_target {
                     let idx = path[depth];
@@ -187,8 +188,7 @@ impl Node {
                         return;
                     }
                 }
-                self.widget.event(ctx, ev);
-                self.invalidate();
+                handle_event(self, ctx);
             }
         }
     }
@@ -200,13 +200,14 @@ impl Node {
                 self.handle_pointer_move(pos, focus);
             }
 
-            WindowEvent::CursorLeft { .. } => self.flush_pointer_leave(focus),
+            WindowEvent::CursorLeft { .. } => {
+                self.flush_pointer_leave(focus);
+            }
 
             WindowEvent::MouseInput { state, button, .. } => {
                 if self.hover_path.is_empty() {
                     return;
                 }
-                let tgt_path = self.hover_path.clone();
                 let kind = match state {
                     ElementState::Pressed => EventKind::PointerDown {
                         button,
@@ -217,50 +218,55 @@ impl Node {
                         pos: Vec2::ZERO,
                     },
                 };
-                Self::send_to_path(self, &tgt_path, kind, focus);
+                Self::send_to_path(self, &self.hover_path.clone(), kind, focus);
             }
 
             WindowEvent::MouseWheel { delta, .. } => {
                 if self.hover_path.is_empty() {
                     return;
                 }
-                let tgt_path = self.hover_path.clone();
                 let d = match delta {
                     MouseScrollDelta::LineDelta(x, y) => glam::vec2(x, y),
                     MouseScrollDelta::PixelDelta(p) => glam::vec2(p.x as f32, p.y as f32),
                 };
-                Self::send_to_path(self, &tgt_path, EventKind::Wheel { delta: d }, focus);
+                Self::send_to_path(
+                    self,
+                    &self.hover_path.clone(),
+                    EventKind::Wheel { delta: d },
+                    focus,
+                );
             }
 
             WindowEvent::KeyboardInput {
                 event: ref key_ev, ..
             } => {
-                let key = match key_ev.physical_key {
-                    PhysicalKey::Code(k) => k,
-                    _ => return,
-                };
-                let kind = match key_ev.state {
-                    ElementState::Pressed => EventKind::KeyDown { key },
-                    ElementState::Released => EventKind::KeyUp { key },
-                };
+                let focused_path = focus.path().to_vec();
+                if focused_path.is_empty() {
+                    return;
+                }
 
-                let path = focus.path().to_vec();
-                if !path.is_empty() {
-                    Self::send_to_path(self, &path, kind, focus);
+                if let PhysicalKey::Code(key) = key_ev.physical_key {
+                    let kind = match key_ev.state {
+                        ElementState::Pressed => EventKind::KeyDown { key },
+                        ElementState::Released => EventKind::KeyUp { key },
+                    };
+                    Self::send_to_path(self, &focused_path, kind, focus);
+                }
 
-                    if let Some(text) = &key_ev.text {
-                        if let Some(ch) = text.chars().next() {
-                            Self::send_to_path(self, &path, EventKind::CharInput { ch }, focus);
-                        }
+                if let Some(text) = &key_ev.text {
+                    if let Some(ch) = text.chars().next() {
+                        Self::send_to_path(self, &focused_path, EventKind::CharInput { ch }, focus);
                     }
                 }
             }
 
             WindowEvent::Ime(Ime::Preedit(ref s, _)) if !s.is_empty() => {
-                let path = focus.path().to_vec();
-                if !path.is_empty() {
-                    let ch = s.chars().next().unwrap();
-                    Self::send_to_path(self, &path, EventKind::CharInput { ch }, focus);
+                let focused_path = focus.path().to_vec();
+                if focused_path.is_empty() {
+                    return;
+                }
+                if let Some(ch) = s.chars().next() {
+                    Self::send_to_path(self, &focused_path, EventKind::CharInput { ch }, focus);
                 }
             }
 
@@ -270,7 +276,7 @@ impl Node {
 
     fn send_to_path(node: &mut Node, path: &[usize], kind: EventKind, focus: &mut FocusManager) {
         for &phase in &[Phase::Capture, Phase::Target, Phase::Bubble] {
-            let mut ctx = EventCtx::new(phase, focus, path);
+            let mut ctx = EventCtx::new(phase, focus, path, Rect::new(Vec2::ZERO, Vec2::ZERO));
             node.dispatch(path, 0, phase, &kind, &mut ctx);
         }
     }
@@ -282,41 +288,29 @@ impl Node {
             return;
         }
 
-        let leave_path = self.hover_path.clone();
-        for depth in (0..leave_path.len()).rev() {
-            let slice = &leave_path[..depth + 1];
-            let mut ctx = EventCtx::new(Phase::Target, focus, slice);
-            self.dispatch(
-                slice,
-                depth,
-                Phase::Target,
-                &EventKind::PointerLeave,
-                &mut ctx,
-            );
+        if self.hover_path == new_path {
+            Self::send_to_path(self, &new_path, EventKind::PointerMove { pos }, focus);
+            return;
         }
 
-        let move_ev = EventKind::PointerMove { pos };
-        for &phase in &[Phase::Capture, Phase::Target, Phase::Bubble] {
-            let mut ctx = EventCtx::new(phase, focus, &new_path);
-            self.dispatch(&new_path, 0, phase, &move_ev, &mut ctx);
+        let old_path_clone = self.hover_path.clone();
+        if !old_path_clone.is_empty() {
+            Self::send_to_path(self, &old_path_clone, EventKind::PointerLeave, focus);
         }
+
+        Self::send_to_path(self, &new_path, EventKind::PointerMove { pos }, focus);
 
         self.hover_path = new_path;
     }
 
     fn flush_pointer_leave(&mut self, focus: &mut FocusManager) {
-        let leave_path = self.hover_path.clone();
-        for depth in (0..leave_path.len()).rev() {
-            let slice = &leave_path[..depth + 1];
-            let mut ctx = EventCtx::new(Phase::Target, focus, slice);
-            self.dispatch(
-                slice,
-                depth,
-                Phase::Target,
-                &EventKind::PointerLeave,
-                &mut ctx,
-            );
+        if self.hover_path.is_empty() {
+            return;
         }
+
+        let old_path_clone = self.hover_path.clone();
+        Self::send_to_path(self, &old_path_clone, EventKind::PointerLeave, focus);
+
         self.hover_path.clear();
     }
 
@@ -331,11 +325,15 @@ impl Node {
     }
 
     pub fn set_rect(&mut self, r: Rect) {
-        if self.layout_rect != r {
-            self.layout_rect = r;
-            self.invalidate();
-            self.mark_child_dirty();
+        if self.layout_rect == r {
+            return;
         }
+
+        self.layout_rect = r;
+
+        self.invalidate();
+
+        self.mark_child_dirty();
     }
 
     pub fn origin(&self) -> Vec2 {

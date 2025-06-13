@@ -7,6 +7,7 @@ use glam::{Vec2, Vec4};
 use primatives::{CircleInstance, LineInstance, RectInstance};
 use wgpu::{Device, Queue, TextureFormat};
 
+use crate::layout::Rect;
 pub use gpu::GpuContext;
 pub use primatives::{Primative, RenderPrimative};
 pub use surface::RenderSurface;
@@ -97,6 +98,8 @@ pub struct Renderer<'a> {
     frame_text_slots: Vec<usize>,
     rect_call_idx: usize,
     text_call_idx: usize,
+
+    scissor_stack: Vec<Rect>,
 }
 
 impl<'a> Renderer<'a> {
@@ -244,6 +247,8 @@ impl<'a> Renderer<'a> {
             frame_text_slots: Vec::new(),
             rect_call_idx: 0,
             text_call_idx: 0,
+
+            scissor_stack: Vec::new(),
         })
     }
 
@@ -446,6 +451,17 @@ impl<'a> Renderer<'a> {
                 timestamp_writes: None,
             });
 
+            let size = self.surface.size();
+            let full_rect = Rect::new(Vec2::ZERO, Vec2::new(size.width as f32, size.height as f32));
+            let r = self.scissor_stack.last().unwrap_or(&full_rect);
+
+            let scale_factor = self.surface.scale_factor();
+            let x = (r.origin.x * scale_factor) as u32;
+            let y = (r.origin.y * scale_factor) as u32;
+            let w = (r.size.x * scale_factor) as u32;
+            let h = (r.size.y * scale_factor) as u32;
+            rp.set_scissor_rect(x, y, w, h);
+
             rp.set_bind_group(0, &self.screen_bind, &[]);
 
             rp.set_pipeline(&self.rect_pipe);
@@ -464,6 +480,21 @@ impl<'a> Renderer<'a> {
         self.gpu.queue.submit(Some(enc.finish()));
         frame.present();
         Ok(())
+    }
+
+    pub fn push_scissor_rect(&mut self, rect: Rect) {
+        let new_rect = if let Some(current) = self.scissor_stack.last() {
+            let new_tl = current.origin.max(rect.origin);
+            let new_br = (current.origin + current.size).min(rect.origin + rect.size);
+            Rect::new(new_tl, (new_br - new_tl).max(Vec2::ZERO))
+        } else {
+            rect
+        };
+        self.scissor_stack.push(new_rect);
+    }
+
+    pub fn pop_scissor_rect(&mut self) {
+        self.scissor_stack.pop();
     }
 
     pub fn draw_rounded_rect(&mut self, pos: Vec2, size: Vec2, radius: f32, colour: Vec4) {

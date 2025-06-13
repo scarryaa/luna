@@ -11,10 +11,10 @@ pub fn compute(
     align: Align,
     children: &mut [Node],
     avail: Vec2,
+    content_origin: Vec2,
 ) -> Vec2 {
     let (mut main_used, mut cross_max): (f32, f32) = (0.0, 0.0);
 
-    // 1️⃣ measure
     for n in children.iter_mut() {
         let sz = n.layout(if dir == FlexDir::Row {
             f32::INFINITY
@@ -25,7 +25,6 @@ pub fn compute(
         cross_max = cross_max.max(if dir == FlexDir::Row { sz.y } else { sz.x });
     }
 
-    // 2️⃣ free space
     let free = (if dir == FlexDir::Row {
         avail.x
     } else {
@@ -39,7 +38,6 @@ pub fn compute(
         0.0
     };
 
-    // justify
     let mut offset = 0.0;
     let mut gap = 0.0;
     match justify {
@@ -49,7 +47,6 @@ pub fn compute(
         _ => {}
     }
 
-    // 3️⃣ place children
     let mut cursor = offset;
     for n in children.iter_mut() {
         let extra = grow_unit * n.style().flex_grow;
@@ -65,7 +62,7 @@ pub fn compute(
         } else {
             vec2(cross_max, n.cached().y + extra)
         };
-        let pos = n.origin()
+        let pos = content_origin
             + if dir == FlexDir::Row {
                 vec2(cursor, 0.0)
             } else {

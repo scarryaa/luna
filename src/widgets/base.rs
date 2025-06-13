@@ -12,7 +12,7 @@ pub trait Widget: WidgetClone {
 
     fn measure(&self, max_width: f32) -> Vec2;
 
-    fn paint(&self, layout: Rect, ren: &mut Renderer);
+    fn paint(&mut self, layout: Rect, ren: &mut Renderer);
 
     fn event(&mut self, _ctx: &mut EventCtx, _ev: &EventKind) {}
 

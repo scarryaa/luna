@@ -43,11 +43,11 @@ impl Widget for Grid {
         self.children.clone()
     }
 
-    fn measure(&self, _max: f32) -> Vec2 {
+    fn measure(&self, _max_width: f32) -> Vec2 {
         Vec2::ZERO
     }
 
-    fn paint(&self, _rect: Rect, _ren: &mut Renderer) {}
+    fn paint(&mut self, _rect: Rect, _ren: &mut Renderer) {}
 
     fn style(&self) -> Style {
         self.style
@@ -90,21 +90,29 @@ fn main() -> luna::Result<()> {
             root.collect(&mut renderer);
             renderer.end_frame().ok();
         }
-        Event::WindowEvent {
-            window_id,
-            event: w_event,
-        } if *window_id == window.id() => {
-            match w_event {
+        Event::WindowEvent { window_id, event } if *window_id == window.id() => {
+            match event {
                 WindowEvent::CloseRequested => elwt.exit(),
+
                 WindowEvent::Resized(sz) => {
                     win_width = sz.width as f32;
+
                     renderer.resize(*sz);
+
+                    root.set_rect(Rect::new(
+                        vec2(0.0, 0.0),
+                        vec2(sz.width as f32, sz.height as f32),
+                    ));
+
+                    root.mark_dirty();
+
                     window.request_redraw();
                 }
+
                 _ => {}
             }
 
-            root.route_window_event(w_event, &mut focus_manager);
+            root.route_window_event(event, &mut focus_manager);
             window.request_redraw();
         }
         _ => {}

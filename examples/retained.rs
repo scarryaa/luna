@@ -1,7 +1,5 @@
 use glam::vec2;
 use luna::{layout::node::Node, windowing::events::FocusManager};
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 use winit::{
     event::{Event, WindowEvent},
@@ -32,11 +30,7 @@ fn main() -> Result<()> {
     let cloned_window = window.clone();
     let mut renderer = pollster::block_on(Renderer::new(&cloned_window))?;
 
-    let button = Button {
-        label: "Click".into(),
-        on_click: Rc::new(RefCell::new(|| log::info!("clicked!"))),
-        hovered: false,
-    };
+    let button = Button::label("Click").on_click(|| log::info!("clicked!"));
 
     let root_widget = Column {
         spacing: 8.0,

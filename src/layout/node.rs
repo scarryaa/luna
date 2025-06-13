@@ -59,25 +59,30 @@ impl Node {
             return self.cached_size;
         }
 
+        self.dirty.paint_dirty = true;
+
         if self.dirty.self_dirty {
             self.cached_size = self.widget.measure(max_width);
         }
 
         if self.children.is_empty() {
+            self.dirty.self_dirty = false;
             self.dirty.child_dirty = false;
             return self.cached_size;
         }
 
         let style = self.widget.style();
         let avail = vec2(max_width, f32::INFINITY) - style.padding_total();
+        let content_origin = self.layout_rect.origin + style.padding_tl();
 
         match style.display {
             Display::Block => {
                 let mut y = style.padding.y;
                 for child in &mut self.children {
                     let sz = child.layout(avail.x);
-                    child.layout_rect =
+                    let new_rect =
                         Rect::new(self.layout_rect.origin + vec2(style.padding.x, y), sz);
+                    child.set_rect(new_rect);
                     y += sz.y;
                 }
                 self.cached_size = vec2(max_width, y) + style.padding_total();
@@ -89,15 +94,22 @@ impl Node {
                     style.flex.align,
                     &mut self.children,
                     avail,
+                    content_origin,
                 );
                 self.cached_size = sz + style.padding_total();
             }
             Display::Grid => {
-                let sz = crate::layout::grid::compute(style.grid, &mut self.children, avail);
+                let sz = crate::layout::grid::compute(
+                    style.grid,
+                    &mut self.children,
+                    avail,
+                    content_origin,
+                );
                 self.cached_size = sz + style.padding_total();
             }
         }
 
+        self.dirty.self_dirty = false;
         self.dirty.child_dirty = false;
         self.cached_size
     }
@@ -319,7 +331,11 @@ impl Node {
     }
 
     pub fn set_rect(&mut self, r: Rect) {
-        self.layout_rect = r;
+        if self.layout_rect != r {
+            self.layout_rect = r;
+            self.invalidate();
+            self.mark_child_dirty();
+        }
     }
 
     pub fn origin(&self) -> Vec2 {
@@ -332,5 +348,10 @@ impl Node {
 
     pub fn mark_child_dirty(&mut self) {
         self.dirty.child_dirty = true;
+    }
+
+    pub fn mark_dirty(&mut self) {
+        self.dirty.self_dirty = true;
+        self.dirty.paint_dirty = true;
     }
 }

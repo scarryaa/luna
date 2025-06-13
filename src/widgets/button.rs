@@ -8,6 +8,7 @@ use super::base::Widget;
 use crate::{
     Renderer,
     layout::Rect,
+    renderer::{RectId, RenderPrimative, primatives::RectInstance},
     style::tokens::{Colour, Radius, Spacing, Typography},
     windowing::events::{EventCtx, EventKind, Phase},
 };
@@ -17,6 +18,8 @@ pub struct Button {
     pub label: String,
     pub on_click: Rc<RefCell<dyn FnMut()>>,
     pub hovered: bool,
+    bg_id: Option<RectId>,
+    label_id: Option<usize>,
 }
 
 impl Button {
@@ -25,7 +28,14 @@ impl Button {
             label: txt.into(),
             on_click: Rc::new(RefCell::new(|| {})),
             hovered: false,
+            bg_id: None,
+            label_id: None,
         }
+    }
+
+    pub fn on_click(mut self, handler: impl FnMut() + 'static) -> Self {
+        self.on_click = Rc::new(RefCell::new(handler));
+        self
     }
 }
 
@@ -38,22 +48,41 @@ impl Widget for Button {
         )
     }
 
-    fn paint(&self, layout: Rect, ren: &mut Renderer) {
-        let bg = if self.hovered {
+    fn paint(&mut self, layout: Rect, ren: &mut Renderer) {
+        let bg_color = if self.hovered {
             Vec4::from(Colour::PRIMARY_HOVER)
         } else {
             Vec4::from(Colour::PRIMARY)
         };
 
-        ren.draw_rounded_rect(layout.origin, layout.size, Radius::MD, bg);
+        let id = *self.bg_id.get_or_insert_with(|| ren.alloc_rect());
+
+        ren.update_rect(
+            id,
+            RectInstance {
+                pos: layout.origin.to_array(),
+                size: layout.size.to_array(),
+                color: bg_color.to_array(),
+                radius: Radius::MD,
+                z: 0.0,
+                _pad: 0.0,
+            },
+        );
 
         let txt_pos = layout.origin + vec2(Spacing::MD, Spacing::SM);
-        ren.draw_text(
+
+        let text_prim = RenderPrimative::text(
             &self.label,
             txt_pos,
             Vec4::from(Colour::TEXT),
             Typography::BODY,
         );
+
+        if let Some(label_id) = self.label_id {
+            ren.update_text(label_id, text_prim);
+        } else {
+            self.label_id = Some(ren.push_text(text_prim));
+        }
     }
 
     fn hit_test(&self, pt: Vec2, layout: Rect) -> bool {

@@ -30,7 +30,7 @@ impl Widget for Text {
         vec2(self.content.len() as f32 * self.size * 0.6, self.size)
     }
 
-    fn paint(&self, layout: Rect, ren: &mut Renderer) {
+    fn paint(&mut self, layout: Rect, ren: &mut Renderer) {
         ren.draw_text(&self.content, layout.origin, self.color, self.size);
     }
 }

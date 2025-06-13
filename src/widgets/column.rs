@@ -40,7 +40,7 @@ impl Widget for Column {
         vec2(w, h)
     }
 
-    fn paint(&self, _layout: Rect, _ren: &mut Renderer) {}
+    fn paint(&mut self, _layout: Rect, _ren: &mut Renderer) {}
 }
 
 impl Clone for Column {

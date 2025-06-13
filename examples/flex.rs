@@ -3,7 +3,7 @@ use std::sync::Arc;
 use glam::{Vec2, vec2};
 use winit::{
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
     window::WindowBuilder,
 };
 
@@ -30,7 +30,7 @@ impl Widget for FlexRow {
         Vec2::ZERO
     }
 
-    fn paint(&self, _r: Rect, _ren: &mut Renderer) {}
+    fn paint(&mut self, _r: Rect, _ren: &mut Renderer) {}
 
     fn style(&self) -> Style {
         self.style
@@ -41,7 +41,6 @@ fn main() -> luna::Result<()> {
     luna::init_logging();
 
     let event_loop = EventLoop::new()?;
-    event_loop.set_control_flow(ControlFlow::Poll);
 
     let window = Arc::new(
         WindowBuilder::new()
@@ -49,8 +48,8 @@ fn main() -> luna::Result<()> {
             .with_inner_size(winit::dpi::LogicalSize::new(640, 120))
             .build(&event_loop)?,
     );
-    let cloned_window = window.clone();
 
+    let cloned_window = window.clone();
     let mut renderer = pollster::block_on(Renderer::new(&cloned_window))?;
 
     let btn = |txt| Box::new(Button::label(txt)) as Box<dyn Widget>;
@@ -77,6 +76,8 @@ fn main() -> luna::Result<()> {
     let mut win_width = window.inner_size().width as f32;
     let mut focus_manager = FocusManager::default();
 
+    window.request_redraw();
+
     let _ = event_loop.run(move |event, elwt| match &event {
         Event::WindowEvent {
             window_id,
@@ -88,21 +89,29 @@ fn main() -> luna::Result<()> {
             renderer.end_frame().ok();
         }
 
-        Event::AboutToWait => window.request_redraw(),
-
         Event::WindowEvent {
             window_id,
             event: w_event,
         } if *window_id == window.id() => {
             match w_event {
                 WindowEvent::CloseRequested => elwt.exit(),
+
                 WindowEvent::Resized(sz) => {
                     win_width = sz.width as f32;
                     renderer.resize(*sz);
+
+                    root.set_rect(Rect::new(
+                        vec2(0.0, 0.0),
+                        vec2(sz.width as f32, sz.height as f32),
+                    ));
+
+                    root.mark_dirty();
                 }
                 _ => {}
             }
             root.route_window_event(w_event, &mut focus_manager);
+
+            window.request_redraw();
         }
         _ => {}
     });

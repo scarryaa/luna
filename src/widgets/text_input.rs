@@ -392,10 +392,15 @@ impl Widget for TextInput {
                         Key::Character(s) if s == "v" => {
                             if let Ok(mut clip) = Clipboard::new() {
                                 if let Ok(text) = clip.get_text() {
+                                    let sanitized_text = text.replace('\r', "").replace('\n', " ");
+
                                     self.delete_selection();
                                     let byte_idx = self.get_byte_index(self.cursor);
-                                    self.value.insert_str(byte_idx, &text);
-                                    self.move_cursor(self.cursor + text.chars().count(), false);
+                                    self.value.insert_str(byte_idx, &sanitized_text);
+                                    self.move_cursor(
+                                        self.cursor + sanitized_text.chars().count(),
+                                        false,
+                                    );
                                 }
                             }
                         }

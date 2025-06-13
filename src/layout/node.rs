@@ -118,6 +118,10 @@ impl Node {
         if self.dirty.paint_dirty {
             self.widget.paint(&mut self.children, self.layout_rect, ren);
             self.dirty.paint_dirty = false;
+        } else {
+            for child in &mut self.children {
+                child.collect(ren);
+            }
         }
     }
 
@@ -328,11 +332,8 @@ impl Node {
         if self.layout_rect == r {
             return;
         }
-
         self.layout_rect = r;
-
         self.invalidate();
-
         self.mark_child_dirty();
     }
 

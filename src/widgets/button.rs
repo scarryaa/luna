@@ -102,7 +102,9 @@ impl Widget for Button {
                 self.hovered = true;
                 ctx.stop_propagation();
             }
-            EventKind::PointerLeave => self.hovered = false,
+            EventKind::PointerLeave => {
+                self.hovered = false;
+            }
 
             EventKind::PointerUp {
                 button: MouseButton::Left,

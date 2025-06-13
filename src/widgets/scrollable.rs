@@ -1,8 +1,9 @@
 use glam::{Vec2, vec2};
 
 use crate::{
-    Renderer, Widget,
+    Widget,
     layout::{Rect, node::Node},
+    renderer::Renderer,
     windowing::events::{EventCtx, EventKind},
 };
 
@@ -32,16 +33,16 @@ impl Widget for Scrollable {
         vec2(max_width, f32::INFINITY)
     }
 
-    fn event(&mut self, _ctx: &mut EventCtx, ev: &EventKind) {
+    fn event(&mut self, ctx: &mut EventCtx, ev: &EventKind) {
         if let EventKind::Wheel { delta } = ev {
             let scroll_amount = delta.y * 20.0;
             self.offset.y -= scroll_amount;
 
             self.offset.y = self.offset.y.max(0.0);
-            let max_offset_y = (self.child_size.y - _ctx.node_layout.size.y).max(0.0);
+            let max_offset_y = (self.child_size.y - ctx.node_layout.size.y).max(0.0);
             self.offset.y = self.offset.y.min(max_offset_y);
 
-            _ctx.request_layout();
+            ctx.request_layout();
         }
     }
 
@@ -54,6 +55,7 @@ impl Widget for Scrollable {
             let child_pos = layout.origin - self.offset;
             child.set_rect(Rect::new(child_pos, self.child_size));
 
+            child.layout(layout.size.x);
             child.collect(ren);
         }
 

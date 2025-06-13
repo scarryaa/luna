@@ -16,4 +16,11 @@ impl Rect {
         let max = self.origin + self.size;
         p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y
     }
+
+    pub fn intersects(&self, other: &Rect) -> bool {
+        self.origin.x < other.origin.x + other.size.x
+            && self.origin.x + self.size.x > other.origin.x
+            && self.origin.y < other.origin.y + other.size.y
+            && self.origin.y + self.size.y > other.origin.y
+    }
 }

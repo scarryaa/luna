@@ -30,9 +30,16 @@ impl Widget for FlexRow {
         Vec2::ZERO
     }
 
-    fn paint(&mut self, children: &mut [luna::layout::node::Node], _r: Rect, _ren: &mut Renderer) {
+    fn paint(
+        &mut self,
+        children: &mut [luna::layout::node::Node],
+        layout: Rect,
+        ren: &mut Renderer,
+    ) {
         for child in children {
-            child.collect(_ren);
+            if child.layout_rect.intersects(&layout) {
+                child.collect(ren);
+            }
         }
     }
 

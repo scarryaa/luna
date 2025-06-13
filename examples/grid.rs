@@ -50,11 +50,13 @@ impl Widget for Grid {
     fn paint(
         &mut self,
         children: &mut [luna::layout::node::Node],
-        _rect: Rect,
-        _ren: &mut Renderer,
+        layout: Rect,
+        ren: &mut Renderer,
     ) {
         for child in children {
-            child.collect(_ren);
+            if child.layout_rect.intersects(&layout) {
+                child.collect(ren);
+            }
         }
     }
 

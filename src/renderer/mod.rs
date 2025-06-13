@@ -2,7 +2,7 @@ pub mod gpu;
 pub mod primatives;
 pub mod surface;
 
-use cosmic_text::{Attrs, Color, FontSystem, Metrics, Shaping, SwashCache};
+use cosmic_text::{Attrs, Buffer, Color, FontSystem, Metrics, Shaping, SwashCache};
 use glam::{Vec2, Vec4};
 use primatives::{CircleInstance, LineInstance, RectInstance};
 use wgpu::util::DeviceExt;
@@ -597,6 +597,49 @@ impl<'a> Renderer<'a> {
                 _pad: 0.0,
             },
         );
+    }
+
+    pub fn measure_text_segment_width(&mut self, text: &str, size: f32, char_count: usize) -> f32 {
+        let metrics = Metrics::new(size, size * 1.2);
+        let mut buf = Buffer::new(&mut self.font_system, metrics);
+        let mut buf = buf.borrow_with(&mut self.font_system);
+
+        let segment = text.chars().take(char_count).collect::<String>();
+        buf.set_text(&segment, &Attrs::new(), Shaping::Advanced);
+        buf.shape_until_scroll(true);
+
+        buf.layout_runs().next().map_or(0.0, |run| run.line_w)
+    }
+
+    pub fn text_hit_char_index(&mut self, text: &str, size: f32, pos_x: f32) -> usize {
+        let metrics = Metrics::new(size, size * 1.2);
+        let mut buf = Buffer::new(&mut self.font_system, metrics);
+        let mut buf = buf.borrow_with(&mut self.font_system);
+
+        buf.set_text(text, &Attrs::new(), Shaping::Advanced);
+        buf.shape_until_scroll(true);
+
+        if let Some(cursor) = buf.hit(pos_x, size / 2.0) {
+            text.char_indices()
+                .take_while(|(byte_idx, _)| *byte_idx < cursor.index)
+                .count()
+        } else if pos_x > 0.0 {
+            text.chars().count()
+        } else {
+            0
+        }
+    }
+
+    pub fn font_system(&mut self) -> &mut FontSystem {
+        &mut self.font_system
+    }
+
+    pub fn swash_cache(&mut self) -> &mut SwashCache {
+        &mut self.swash_cache
+    }
+
+    pub fn font_and_swash_cache(&mut self) -> (&mut FontSystem, &mut SwashCache) {
+        (&mut self.font_system, &mut self.swash_cache)
     }
 
     #[inline(always)]

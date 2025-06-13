@@ -40,7 +40,7 @@ fn main() -> Result<()> {
     let mut root_style = Style::default();
     root_style.display = Display::Flex;
     root_style.flex.dir = FlexDir::Column;
-    root_style.flex.align = Align::Center;
+    root_style.flex.align = Align::Stretch;
     root_style.flex.justify = Justify::Center;
     root_style.padding = vec2(16.0, 16.0);
     root_style.flex.gap = 16.0;

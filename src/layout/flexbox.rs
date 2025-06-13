@@ -65,7 +65,7 @@ pub fn compute(flex_style: Flex, children: &mut [Node], avail: Vec2, content_ori
             let s = vec2(
                 child_size.x + extra,
                 if flex_style.align == Align::Stretch {
-                    cross_max
+                    avail.y
                 } else {
                     child_size.y
                 },
@@ -81,7 +81,7 @@ pub fn compute(flex_style: Flex, children: &mut [Node], avail: Vec2, content_ori
             let p = content_origin + vec2(cross_offset, cursor);
             let s = vec2(
                 if flex_style.align == Align::Stretch {
-                    cross_max
+                    avail.x
                 } else {
                     child_size.x
                 },
@@ -94,8 +94,18 @@ pub fn compute(flex_style: Flex, children: &mut [Node], avail: Vec2, content_ori
         cursor += (if dir == FlexDir::Row { size.x } else { size.y }) + gap;
     }
 
+    let final_main = (cursor - gap).max(0.0);
+    let final_cross = if flex_style.align == Align::Stretch {
+        if dir == FlexDir::Row {
+            avail.y
+        } else {
+            avail.x
+        }
+    } else {
+        cross_max
+    };
     if dir == FlexDir::Row {
-        vec2(cursor - gap, cross_max)
+        vec2(final_main, final_cross)
     } else {
         vec2(cross_max, cursor - gap)
     }

@@ -17,19 +17,6 @@ struct FlexRow {
     children: Vec<Box<dyn Widget>>,
 }
 
-impl FlexRow {
-    fn new(children: Vec<Box<dyn Widget>>) -> Self {
-        Self {
-            children,
-            style: Style {
-                display: Display::Flex,
-                flex: Default::default(),
-                ..Default::default()
-            },
-        }
-    }
-}
-
 impl Widget for FlexRow {
     fn build(&self, _ctx: &mut BuildCtx) -> Vec<Box<dyn Widget>> {
         self.children.clone()

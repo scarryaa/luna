@@ -465,6 +465,14 @@ impl<'a> Renderer<'a> {
         Ok(())
     }
 
+    pub fn draw_rounded_rect(&mut self, pos: Vec2, size: Vec2, radius: f32, colour: Vec4) {
+        if radius <= 0.0 {
+            self.draw_rect(pos, size, colour);
+        } else {
+            self.draw_rect(pos, size, colour);
+        }
+    }
+
     pub fn draw_rect(&mut self, pos: Vec2, size: Vec2, color: Vec4) {
         if self.rect_call_idx == self.frame_rect_slots.len() {
             let id = self.alloc_rect();

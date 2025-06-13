@@ -1,5 +1,6 @@
 use glam::{Vec2, vec2};
 
+use crate::style::tokens::Spacing;
 use crate::{Renderer, layout::Rect};
 
 use super::{BuildCtx, Widget};
@@ -7,6 +8,15 @@ use super::{BuildCtx, Widget};
 pub struct Column {
     pub children: Vec<Box<dyn Widget>>,
     pub spacing: f32,
+}
+
+impl Default for Column {
+    fn default() -> Self {
+        Self {
+            children: Vec::new(),
+            spacing: Spacing::SM,
+        }
+    }
 }
 
 impl Widget for Column {

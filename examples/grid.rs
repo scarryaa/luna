@@ -1,14 +1,17 @@
 use glam::{Vec2, vec2};
-use luna::{
-    layout::Rect,
-    renderer::Renderer,
-    style::{Display, Grid as GridStyle, Style},
-    widgets::{BuildCtx, Button, Widget},
-};
+use std::sync::Arc;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
+};
+
+use luna::{
+    layout::{Rect, node::Node},
+    renderer::Renderer,
+    style::{Display, Grid as GridStyle, Style},
+    widgets::{BuildCtx, Button, Widget},
+    windowing::events::FocusManager,
 };
 
 #[derive(Clone)]
@@ -42,7 +45,7 @@ impl Widget for Grid {
 
     fn measure(&self, _max: f32) -> Vec2 {
         Vec2::ZERO
-    } // grid sizes children
+    }
 
     fn paint(&self, _rect: Rect, _ren: &mut Renderer) {}
 
@@ -55,42 +58,57 @@ fn main() -> luna::Result<()> {
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let window = WindowBuilder::new()
-        .with_title("Grid demo")
-        .with_inner_size(winit::dpi::LogicalSize::new(480, 320))
-        .build(&event_loop)?;
+    let window = Arc::new(
+        WindowBuilder::new()
+            .with_title("Grid demo")
+            .with_inner_size(winit::dpi::LogicalSize::new(480, 320))
+            .build(&event_loop)?,
+    );
+    window.request_redraw();
 
-    let mut renderer = pollster::block_on(Renderer::new(&window))?;
+    let cloned_window = window.clone();
+    let mut renderer = pollster::block_on(Renderer::new(&cloned_window))?;
+    let make_btn = |i| Box::new(Button::label(&format!("Btn {i}"))) as Box<dyn Widget>;
+    let grid = Grid::new(3, (1..10).map(make_btn).collect());
 
-    let mut ctx = BuildCtx;
-    let make = |i| Box::new(Button::label(&format!("Btn {i}"))) as Box<dyn Widget>;
-    let grid = Grid::new(3, (1..10).map(make).collect());
-
-    let mut root = luna::layout::node::Node::new(
+    let mut root = Node::new(
         Box::new(grid),
         Rect::new(vec2(0.0, 0.0), vec2(480.0, 320.0)),
-        &mut ctx,
+        &mut BuildCtx,
     );
 
     let mut win_width = window.inner_size().width as f32;
+    let mut focus_manager = FocusManager::default();
 
-    let _ = event_loop.run(|event, elwt| match event {
-        Event::WindowEvent { window_id, event } if window_id == window.id() => match event {
-            WindowEvent::CloseRequested => elwt.exit(),
-            WindowEvent::Resized(sz) => {
-                win_width = sz.width as f32;
-                renderer.resize(sz);
+    let _ = event_loop.run(move |event, elwt| match &event {
+        Event::WindowEvent {
+            window_id,
+            event: WindowEvent::RedrawRequested,
+        } if *window_id == window.id() => {
+            renderer.begin_frame();
+            root.layout(win_width);
+            root.collect(&mut renderer);
+            renderer.end_frame().ok();
+        }
+        Event::WindowEvent {
+            window_id,
+            event: w_event,
+        } if *window_id == window.id() => {
+            match w_event {
+                WindowEvent::CloseRequested => elwt.exit(),
+                WindowEvent::Resized(sz) => {
+                    win_width = sz.width as f32;
+                    renderer.resize(*sz);
+                    window.request_redraw();
+                }
+                _ => {}
             }
-            WindowEvent::RedrawRequested => {
-                renderer.begin_frame();
-                root.layout(win_width);
-                root.collect(&mut renderer);
-                renderer.end_frame().ok();
-            }
-            _ => {}
-        },
-        Event::AboutToWait => window.request_redraw(),
+
+            root.route_window_event(w_event, &mut focus_manager);
+            window.request_redraw();
+        }
         _ => {}
     });
+
     Ok(())
 }

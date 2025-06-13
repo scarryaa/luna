@@ -1,5 +1,6 @@
 use super::BuildCtx;
 use crate::style::Style;
+use crate::windowing::events::{EventCtx, EventKind};
 use crate::{Renderer, layout::Rect};
 use glam::Vec2;
 use winit::event::WindowEvent;
@@ -12,6 +13,8 @@ pub trait Widget: WidgetClone {
     fn measure(&self, max_width: f32) -> Vec2;
 
     fn paint(&self, layout: Rect, ren: &mut Renderer);
+
+    fn event(&mut self, _ctx: &mut EventCtx, _ev: &EventKind) {}
 
     fn hit_test(&self, _pt: Vec2, _layout: Rect) -> bool {
         false

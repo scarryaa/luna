@@ -1,4 +1,5 @@
 pub mod app;
+pub mod debug;
 pub mod layout;
 pub mod renderer;
 pub mod style;

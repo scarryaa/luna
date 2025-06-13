@@ -1,14 +1,18 @@
+use std::sync::Arc;
+
 use glam::{Vec2, vec2};
-use luna::{
-    layout::Rect,
-    renderer::Renderer,
-    style::{Align, Display, FlexDir, Justify, Style},
-    widgets::{BuildCtx, Button, Widget},
-};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::WindowBuilder,
+};
+
+use luna::{
+    layout::{Rect, node::Node},
+    renderer::Renderer,
+    style::{Align, Display, FlexDir, Justify, Style},
+    widgets::{BuildCtx, Button, Widget},
+    windowing::events::FocusManager,
 };
 
 #[derive(Clone)]
@@ -22,11 +26,11 @@ impl Widget for FlexRow {
         self.children.clone()
     }
 
-    fn measure(&self, _max_w: f32) -> Vec2 {
+    fn measure(&self, _max: f32) -> Vec2 {
         Vec2::ZERO
-    } // flex sizes children
+    }
 
-    fn paint(&self, _rect: Rect, _ren: &mut Renderer) {}
+    fn paint(&self, _r: Rect, _ren: &mut Renderer) {}
 
     fn style(&self) -> Style {
         self.style
@@ -39,15 +43,16 @@ fn main() -> luna::Result<()> {
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let window = WindowBuilder::new()
-        .with_title("Flex demo")
-        .with_inner_size(winit::dpi::LogicalSize::new(640, 120))
-        .build(&event_loop)?;
+    let window = Arc::new(
+        WindowBuilder::new()
+            .with_title("Flex demo")
+            .with_inner_size(winit::dpi::LogicalSize::new(640, 120))
+            .build(&event_loop)?,
+    );
+    let cloned_window = window.clone();
 
-    let mut renderer = pollster::block_on(Renderer::new(&window))?;
+    let mut renderer = pollster::block_on(Renderer::new(&cloned_window))?;
 
-    // three buttons that stretch & space-between
-    let mut ctx = BuildCtx;
     let btn = |txt| Box::new(Button::label(txt)) as Box<dyn Widget>;
     let row = FlexRow {
         style: Style {
@@ -63,31 +68,44 @@ fn main() -> luna::Result<()> {
         children: vec![btn("One"), btn("Two"), btn("Three")],
     };
 
-    let mut root = luna::layout::node::Node::new(
+    let mut root = Node::new(
         Box::new(row),
         Rect::new(vec2(0.0, 0.0), vec2(640.0, 120.0)),
-        &mut ctx,
+        &mut BuildCtx,
     );
 
     let mut win_width = window.inner_size().width as f32;
+    let mut focus_manager = FocusManager::default();
 
-    let _ = event_loop.run(|event, elwt| match event {
-        Event::WindowEvent { window_id, event } if window_id == window.id() => match event {
-            WindowEvent::CloseRequested => elwt.exit(),
-            WindowEvent::Resized(sz) => {
-                win_width = sz.width as f32;
-                renderer.resize(sz);
-            }
-            WindowEvent::RedrawRequested => {
-                renderer.begin_frame();
-                root.layout(win_width);
-                root.collect(&mut renderer);
-                renderer.end_frame().ok();
-            }
-            _ => {}
-        },
+    let _ = event_loop.run(move |event, elwt| match &event {
+        Event::WindowEvent {
+            window_id,
+            event: WindowEvent::RedrawRequested,
+        } if *window_id == window.id() => {
+            renderer.begin_frame();
+            root.layout(win_width);
+            root.collect(&mut renderer);
+            renderer.end_frame().ok();
+        }
+
         Event::AboutToWait => window.request_redraw(),
+
+        Event::WindowEvent {
+            window_id,
+            event: w_event,
+        } if *window_id == window.id() => {
+            match w_event {
+                WindowEvent::CloseRequested => elwt.exit(),
+                WindowEvent::Resized(sz) => {
+                    win_width = sz.width as f32;
+                    renderer.resize(*sz);
+                }
+                _ => {}
+            }
+            root.route_window_event(w_event, &mut focus_manager);
+        }
         _ => {}
     });
+
     Ok(())
 }

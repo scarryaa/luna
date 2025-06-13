@@ -9,6 +9,7 @@ use crate::{
     Renderer,
     layout::Rect,
     style::tokens::{Colour, Radius, Spacing, Typography},
+    windowing::events::{EventCtx, EventKind, Phase},
 };
 
 #[derive(Clone)]
@@ -57,6 +58,32 @@ impl Widget for Button {
 
     fn hit_test(&self, pt: Vec2, layout: Rect) -> bool {
         layout.contains(pt)
+    }
+
+    fn event(&mut self, ctx: &mut EventCtx, ev: &EventKind) {
+        match *ev {
+            EventKind::PointerDown {
+                button: MouseButton::Left,
+                ..
+            } if ctx.phase == Phase::Target => {
+                ctx.focus.request_focus(ctx.path);
+                ctx.stop_propagation();
+            }
+            EventKind::PointerMove { .. } if ctx.phase == Phase::Target => {
+                self.hovered = true;
+                ctx.stop_propagation();
+            }
+            EventKind::PointerLeave => self.hovered = false,
+
+            EventKind::PointerUp {
+                button: MouseButton::Left,
+                ..
+            } if ctx.phase == Phase::Target => {
+                (self.on_click.borrow_mut())();
+                ctx.stop_propagation();
+            }
+            _ => {}
+        }
     }
 
     fn input(&mut self, event: &WindowEvent) {

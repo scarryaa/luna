@@ -66,6 +66,12 @@ pub type RectId = usize;
 pub type LineId = usize;
 pub type CircId = usize;
 
+struct TextData {
+    primative: RenderPrimative,
+    glyph_rect_ids: Vec<RectId>,
+    is_dirty: bool,
+}
+
 pub struct Renderer<'a> {
     gpu: GpuContext,
     surface: RenderSurface<'a>,
@@ -83,8 +89,7 @@ pub struct Renderer<'a> {
 
     font_system: FontSystem,
     swash_cache: SwashCache,
-    text_pool: Vec<RenderPrimative>,
-    text_slots: Vec<usize>,
+    text_pool: Vec<TextData>,
 
     rect_pool: Vec<RectInstance>,
     line_pool: Vec<LineInstance>,
@@ -95,7 +100,7 @@ pub struct Renderer<'a> {
     circ_dirty: Vec<(usize, CircleInstance)>,
 
     frame_rect_slots: Vec<usize>,
-    frame_text_slots: Vec<usize>,
+    frame_text_ids: Vec<usize>,
     rect_call_idx: usize,
     text_call_idx: usize,
 
@@ -232,19 +237,18 @@ impl<'a> Renderer<'a> {
 
             font_system,
             swash_cache,
-            text_slots: Vec::new(),
+            text_pool: Vec::new(),
 
             rect_pool: Vec::new(),
             line_pool: Vec::new(),
             circ_pool: Vec::new(),
-            text_pool: Vec::new(),
 
             rect_dirty: Vec::new(),
             line_dirty: Vec::new(),
             circ_dirty: Vec::new(),
 
             frame_rect_slots: Vec::new(),
-            frame_text_slots: Vec::new(),
+            frame_text_ids: Vec::new(),
             rect_call_idx: 0,
             text_call_idx: 0,
 
@@ -254,12 +258,19 @@ impl<'a> Renderer<'a> {
 
     pub fn push_text(&mut self, p: RenderPrimative) -> usize {
         let id = self.text_pool.len();
-        self.text_pool.push(p);
+        self.text_pool.push(TextData {
+            primative: p,
+            glyph_rect_ids: Vec::new(),
+            is_dirty: true,
+        });
         id
     }
 
     pub fn update_text(&mut self, id: usize, p: RenderPrimative) {
-        self.text_pool[id] = p;
+        if self.text_pool[id].primative != p {
+            self.text_pool[id].primative = p;
+            self.text_pool[id].is_dirty = true;
+        }
     }
 
     pub fn alloc_rect(&mut self) -> RectId {
@@ -374,30 +385,49 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn end_frame(&mut self) -> crate::Result<()> {
-        let mut glyph_rects = Vec::<RectInstance>::new();
-        {
-            let font = &mut self.font_system;
-            let swash = &mut self.swash_cache;
+        let dirty_items: Vec<(usize, RenderPrimative, Vec<RectId>)> = self
+            .text_pool
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.is_dirty)
+            .map(|(i, t)| (i, t.primative.clone(), t.glyph_rect_ids.clone()))
+            .collect();
 
-            for prim in &self.text_pool {
-                Renderer::blit_text(prim, font, swash, &mut glyph_rects);
+        for (index, primative, old_glyph_ids) in dirty_items {
+            let mut new_glyph_instances = Vec::new();
+            Renderer::blit_text(
+                &primative,
+                &mut self.font_system,
+                &mut self.swash_cache,
+                &mut new_glyph_instances,
+            );
+
+            let num_new = new_glyph_instances.len();
+            let num_old = old_glyph_ids.len();
+            let mut new_glyph_ids = Vec::with_capacity(num_new);
+
+            for i in 0..num_new.min(num_old) {
+                let rect_id = old_glyph_ids[i];
+                self.update_rect(rect_id, new_glyph_instances[i]);
+                new_glyph_ids.push(rect_id);
             }
-        }
 
-        while self.text_slots.len() < glyph_rects.len() {
-            let id = self.rect_pool.len();
-            self.rect_pool.push(RectInstance::default());
-            self.text_slots.push(id);
-        }
-
-        self.text_slots.truncate(glyph_rects.len());
-
-        for (glyph_idx, inst) in glyph_rects.into_iter().enumerate() {
-            let id = self.text_slots[glyph_idx];
-            if self.rect_pool[id] != inst {
-                self.rect_pool[id] = inst;
-                self.rect_dirty.push((id, inst));
+            if num_new > num_old {
+                for i in num_old..num_new {
+                    let rect_id = self.alloc_rect();
+                    self.update_rect(rect_id, new_glyph_instances[i]);
+                    new_glyph_ids.push(rect_id);
+                }
+            } else if num_new < num_old {
+                for i in num_new..num_old {
+                    let rect_id = old_glyph_ids[i];
+                    self.update_rect(rect_id, RectInstance::default());
+                }
             }
+
+            let text_data = &mut self.text_pool[index];
+            text_data.glyph_rect_ids = new_glyph_ids;
+            text_data.is_dirty = false;
         }
 
         let usage = wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST;
@@ -525,13 +555,13 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn draw_text(&mut self, text: &str, pos: Vec2, color: Vec4, size: f32) {
-        if self.text_call_idx == self.frame_text_slots.len() {
+        if self.text_call_idx == self.frame_text_ids.len() {
             let prim = RenderPrimative::text(text, pos, color, size);
-            let id = self.push_text(prim.clone());
-            self.frame_text_slots.push(id);
+            let id = self.push_text(prim);
+            self.frame_text_ids.push(id);
         }
 
-        let id = self.frame_text_slots[self.text_call_idx];
+        let id = self.frame_text_ids[self.text_call_idx];
         self.text_call_idx += 1;
 
         let prim = RenderPrimative::text(text, pos, color, size);

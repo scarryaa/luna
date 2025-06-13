@@ -1,6 +1,6 @@
 use glam::{Vec2, Vec4};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RenderPrimative {
     Rectangle {
         position: Vec2,

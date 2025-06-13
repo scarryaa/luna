@@ -147,15 +147,6 @@ impl Node {
         ev: &EventKind,
         ctx: &mut EventCtx,
     ) {
-        log::trace!(
-            "dispatch  phase={:?} depth={} idx={} targ={} ev={}",
-            phase,
-            depth,
-            if depth < path.len() { path[depth] } else { 999 },
-            depth == path.len(),
-            dbg_ev!(ev),
-        );
-
         let handle_event = |node: &mut Node, ctx: &mut EventCtx| {
             ctx.node_layout = node.layout_rect;
             node.widget.event(ctx, ev);

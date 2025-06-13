@@ -352,6 +352,7 @@ impl<'a> Renderer<'a> {
                     rgba.b() as f32 / 255.0,
                     rgba.a() as f32 / 255.0,
                 ],
+                radius: 0.0,
                 z: 0.0,
                 _pad: 0.0,
             });
@@ -466,18 +467,11 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn draw_rounded_rect(&mut self, pos: Vec2, size: Vec2, radius: f32, colour: Vec4) {
-        if radius <= 0.0 {
-            self.draw_rect(pos, size, colour);
-        } else {
-            self.draw_rect(pos, size, colour);
-        }
-    }
-
-    pub fn draw_rect(&mut self, pos: Vec2, size: Vec2, color: Vec4) {
         if self.rect_call_idx == self.frame_rect_slots.len() {
             let id = self.alloc_rect();
             self.frame_rect_slots.push(id);
         }
+
         let id = self.frame_rect_slots[self.rect_call_idx];
         self.rect_call_idx += 1;
 
@@ -486,11 +480,17 @@ impl<'a> Renderer<'a> {
             RectInstance {
                 pos: pos.to_array(),
                 size: size.to_array(),
-                color: color.to_array(),
+                color: colour.to_array(),
+                radius,
                 z: 0.0,
                 _pad: 0.0,
             },
         );
+    }
+
+    #[inline(always)]
+    pub fn draw_rect(&mut self, pos: Vec2, size: Vec2, colour: Vec4) {
+        self.draw_rounded_rect(pos, size, 0.0, colour);
     }
 
     pub fn draw_text(&mut self, text: &str, pos: Vec2, color: Vec4, size: f32) {

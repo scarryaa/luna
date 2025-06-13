@@ -32,16 +32,18 @@ pub struct RectInstance {
     pub pos: [f32; 2],
     pub size: [f32; 2],
     pub color: [f32; 4],
+    pub radius: f32,
     pub z: f32,
     pub _pad: f32,
 }
 
 impl RectInstance {
-    const ATTRS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+    const ATTRS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
         0 => Float32x2,   // pos
         1 => Float32x2,   // size
         2 => Float32x4,   // color
-        3 => Float32      // z
+        3 => Float32,     // radius
+        4 => Float32      // z
     ];
 
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
@@ -122,6 +124,7 @@ impl From<&RenderPrimative> for RectInstance {
                 color: color.to_array(),
                 z: 0.0,
                 _pad: 0.0,
+                radius: 0.0,
             },
             _ => unreachable!(),
         }

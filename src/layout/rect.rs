@@ -23,4 +23,12 @@ impl Rect {
             && self.origin.y < other.origin.y + other.size.y
             && self.origin.y + self.size.y > other.origin.y
     }
+
+    pub fn intersection(&self, other: &Rect) -> Rect {
+        let new_tl = self.origin.max(other.origin);
+        let new_br = (self.origin + self.size).min(other.origin + other.size);
+        let new_size = (new_br - new_tl).max(Vec2::ZERO);
+
+        Rect::new(new_tl, new_size)
+    }
 }

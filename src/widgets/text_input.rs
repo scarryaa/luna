@@ -212,12 +212,19 @@ impl Widget for TextInput {
                     let start_x: f32 = run.glyphs.iter().take(start_char).map(|g| g.w).sum();
                     let end_x: f32 = run.glyphs.iter().take(end_char).map(|g| g.w).sum();
 
-                    RectInstance {
-                        pos: [
+                    let full_selection_rect = Rect::new(
+                        vec2(
                             content_area.origin.x + start_x - self.scroll_offset,
                             content_area.origin.y,
-                        ],
-                        size: [end_x - start_x, Typography::BODY],
+                        ),
+                        vec2(end_x - start_x, Typography::BODY),
+                    );
+
+                    let clipped_rect = content_area.intersection(&full_selection_rect);
+
+                    RectInstance {
+                        pos: clipped_rect.origin.to_array(),
+                        size: clipped_rect.size.to_array(),
                         color: [0.3, 0.5, 0.9, 0.5],
                         ..Default::default()
                     }
@@ -265,13 +272,19 @@ impl Widget for TextInput {
                 if self.focused && self.last_blink.elapsed() < Duration::from_millis(500) {
                     let cursor_abs_pos =
                         content_area.origin + vec2(cursor_px_offset - self.scroll_offset, 0.0);
-                    Some(RectInstance {
-                        pos: cursor_abs_pos.to_array(),
-                        size: [2.0, Typography::BODY],
-                        color: Vec4::from(Colour::TEXT).to_array(),
-                        radius: 1.0,
-                        ..Default::default()
-                    })
+                    if cursor_abs_pos.x >= content_area.origin.x
+                        && cursor_abs_pos.x <= content_area.origin.x + content_area.size.x
+                    {
+                        Some(RectInstance {
+                            pos: cursor_abs_pos.to_array(),
+                            size: [2.0, Typography::BODY],
+                            color: Vec4::from(Colour::TEXT).to_array(),
+                            radius: 1.0,
+                            ..Default::default()
+                        })
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 };

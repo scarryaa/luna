@@ -1,6 +1,7 @@
 use glam::{Vec2, vec2};
-use luna::layout::node::Node;
+use luna::TextInput;
 use luna::windowing::events::FocusManager;
+use luna::{Text, layout::node::Node};
 use std::sync::Arc;
 use winit::{
     event::{Event, WindowEvent},
@@ -13,7 +14,7 @@ use luna::{
     layout::Rect,
     renderer::Renderer,
     style::{Align, Display, FlexDir, Justify, Style},
-    widgets::{BuildCtx, Column, Text, TextInput, Widget},
+    widgets::{BuildCtx, Widget},
 };
 
 fn main() -> Result<()> {
@@ -31,22 +32,10 @@ fn main() -> Result<()> {
 
     let cloned_window = window.clone();
 
-    let mut scale_factor = window.scale_factor();
+    let scale_factor = window.scale_factor();
     let mut logical_size = window.inner_size().to_logical::<f32>(scale_factor);
 
     let mut renderer = pollster::block_on(Renderer::new(&cloned_window, scale_factor as f32))?;
-
-    let root_widget = Column {
-        spacing: 16.0,
-        children: vec![
-            Box::new(Text {
-                content: "Enter your name:".to_string(),
-                ..Default::default()
-            }),
-            Box::new(TextInput::new("e.g. Jane Doe")),
-            Box::new(TextInput::new("Another input...")),
-        ],
-    };
 
     let mut root_style = Style::default();
     root_style.display = Display::Flex;
@@ -54,19 +43,23 @@ fn main() -> Result<()> {
     root_style.flex.align = Align::Center;
     root_style.flex.justify = Justify::Center;
     root_style.padding = vec2(16.0, 16.0);
+    root_style.flex.gap = 16.0;
 
     #[derive(Clone)]
     struct Container {
         style: Style,
-        child: Box<dyn Widget>,
+        children: Vec<Box<dyn Widget>>,
     }
+
     impl Widget for Container {
         fn build(&self, _ctx: &mut BuildCtx) -> Vec<Box<dyn Widget>> {
-            vec![self.child.clone()]
+            self.children.clone()
         }
-        fn measure(&self, max: f32) -> Vec2 {
-            self.child.measure(max)
+
+        fn measure(&self, _max: f32) -> Vec2 {
+            Vec2::ZERO
         }
+
         fn paint(
             &mut self,
             children: &mut [luna::layout::node::Node],
@@ -79,6 +72,7 @@ fn main() -> Result<()> {
                 }
             }
         }
+
         fn style(&self) -> Style {
             self.style
         }
@@ -86,7 +80,14 @@ fn main() -> Result<()> {
 
     let container = Container {
         style: root_style,
-        child: Box::new(root_widget),
+        children: vec![
+            Box::new(Text {
+                content: "Enter your name:".to_string(),
+                ..Default::default()
+            }),
+            Box::new(TextInput::new("e.g. Jane Doe")),
+            Box::new(TextInput::new("Another input...")),
+        ],
     };
 
     let mut root = Node::new(
@@ -122,9 +123,13 @@ fn main() -> Result<()> {
                 }
 
                 WindowEvent::ScaleFactorChanged { .. } => {
-                    scale_factor = window.scale_factor();
-                    renderer.set_scale_factor(scale_factor as f32);
-                    log::info!("Event: ScaleFactorChanged to {}", scale_factor);
+                    let physical_size = window.inner_size();
+                    logical_size = physical_size.to_logical(scale_factor);
+                    root.set_rect(Rect::new(
+                        Vec2::ZERO,
+                        vec2(logical_size.width, logical_size.height),
+                    ));
+                    root.mark_dirty();
                 }
 
                 WindowEvent::RedrawRequested => {

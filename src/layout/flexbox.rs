@@ -1,24 +1,24 @@
 use super::node::Node;
+use crate::style::Flex;
 use crate::{
     layout::Rect,
     style::{Align, FlexDir, Justify},
 };
 use glam::{Vec2, vec2};
 
-pub fn compute(
-    dir: FlexDir,
-    justify: Justify,
-    align: Align,
-    children: &mut [Node],
-    avail: Vec2,
-    content_origin: Vec2,
-) -> Vec2 {
+pub fn compute(flex_style: Flex, children: &mut [Node], avail: Vec2, content_origin: Vec2) -> Vec2 {
     let (mut main_used, mut cross_max): (f32, f32) = (0.0, 0.0);
+    let dir = flex_style.dir;
 
     for n in children.iter() {
         let sz = n.cached();
         main_used += if dir == FlexDir::Row { sz.x } else { sz.y };
         cross_max = cross_max.max(if dir == FlexDir::Row { sz.y } else { sz.x });
+    }
+
+    let num_gaps = (children.len() as f32 - 1.0).max(0.0);
+    if flex_style.justify != Justify::SpaceBetween {
+        main_used += num_gaps * flex_style.gap;
     }
 
     let free = (if dir == FlexDir::Row {
@@ -35,11 +35,17 @@ pub fn compute(
     };
 
     let mut offset = 0.0;
-    let mut gap = 0.0;
-    match justify {
+    let mut gap = flex_style.gap;
+    match flex_style.justify {
         Justify::Center => offset = free * 0.5,
         Justify::End => offset = free,
-        Justify::SpaceBetween if children.len() > 1 => gap = free / (children.len() - 1) as f32,
+        Justify::SpaceBetween => {
+            gap = if children.len() > 1 {
+                free / num_gaps
+            } else {
+                0.0
+            };
+        }
         _ => {}
     }
 
@@ -50,7 +56,7 @@ pub fn compute(
 
         let (pos, size) = if dir == FlexDir::Row {
             let cross_avail = avail.y;
-            let cross_offset = match align {
+            let cross_offset = match flex_style.align {
                 Align::Center => (cross_avail - child_size.y).max(0.0) / 2.0,
                 Align::End => (cross_avail - child_size.y).max(0.0),
                 _ => 0.0,
@@ -58,7 +64,7 @@ pub fn compute(
             let p = content_origin + vec2(cursor, cross_offset);
             let s = vec2(
                 child_size.x + extra,
-                if align == Align::Stretch {
+                if flex_style.align == Align::Stretch {
                     cross_max
                 } else {
                     child_size.y
@@ -67,14 +73,14 @@ pub fn compute(
             (p, s)
         } else {
             let cross_avail = avail.x;
-            let cross_offset = match align {
+            let cross_offset = match flex_style.align {
                 Align::Center => (cross_avail - child_size.x).max(0.0) / 2.0,
                 Align::End => (cross_avail - child_size.x).max(0.0),
                 _ => 0.0,
             };
             let p = content_origin + vec2(cross_offset, cursor);
             let s = vec2(
-                if align == Align::Stretch {
+                if flex_style.align == Align::Stretch {
                     cross_max
                 } else {
                     child_size.x
@@ -85,7 +91,7 @@ pub fn compute(
         };
 
         n.set_rect(Rect::new(pos, size));
-        cursor += if dir == FlexDir::Row { size.x } else { size.y } + gap;
+        cursor += (if dir == FlexDir::Row { size.x } else { size.y }) + gap;
     }
 
     if dir == FlexDir::Row {

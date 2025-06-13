@@ -34,6 +34,7 @@ pub struct Flex {
     pub dir: FlexDir,
     pub justify: Justify,
     pub align: Align,
+    pub gap: f32,
 }
 
 impl Default for Flex {
@@ -42,6 +43,7 @@ impl Default for Flex {
             dir: FlexDir::Row,
             justify: Justify::Start,
             align: Align::Stretch,
+            gap: 0.0,
         }
     }
 }

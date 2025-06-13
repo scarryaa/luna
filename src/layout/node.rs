@@ -89,9 +89,7 @@ impl Node {
             }
             Display::Flex => {
                 let sz = crate::layout::flexbox::compute(
-                    style.flex.dir,
-                    style.flex.justify,
-                    style.flex.align,
+                    style.flex,
                     &mut self.children,
                     avail,
                     content_origin,

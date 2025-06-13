@@ -1,4 +1,5 @@
-use glam::{Vec2, vec2};
+use crate::Style;
+use glam::Vec2;
 use winit::event::{DeviceId, WindowEvent};
 
 use crate::{
@@ -16,11 +17,11 @@ pub enum PrimId {
 }
 
 pub struct Node {
-    widget: Box<dyn Widget>,
+    pub widget: Box<dyn Widget>,
     children: Vec<Node>,
 
-    layout_rect: Rect, // absolute rect in parent space
-    cached_size: Vec2, // result of last `measure`
+    pub layout_rect: Rect, // absolute rect in parent space
+    pub cached_size: Vec2, // result of last `measure`
     dirty: Dirty,
 }
 
@@ -45,6 +46,22 @@ impl Node {
         }
     }
 
+    pub fn style(&self) -> Style {
+        self.widget.style()
+    }
+
+    pub fn cached(&self) -> Vec2 {
+        self.cached_size
+    }
+
+    pub fn origin(&self) -> Vec2 {
+        self.layout_rect.origin
+    }
+
+    pub fn set_rect(&mut self, r: Rect) {
+        self.layout_rect = r
+    }
+
     pub fn invalidate(&mut self) {
         if !self.dirty.self_dirty {
             self.dirty.self_dirty = true;
@@ -56,6 +73,8 @@ impl Node {
     }
 
     pub fn layout(&mut self, max_width: f32) -> Vec2 {
+        use crate::style::Display;
+
         if !self.dirty.self_dirty && !self.dirty.child_dirty {
             return self.cached_size;
         }
@@ -64,12 +83,39 @@ impl Node {
             self.cached_size = self.widget.measure(max_width);
         }
 
-        if self.dirty.self_dirty || self.dirty.child_dirty {
-            let mut y = 0.0;
-            for child in &mut self.children {
-                let sz = child.layout(self.cached_size.x);
-                child.layout_rect = Rect::new(self.layout_rect.origin + vec2(0.0, y), sz);
-                y += sz.y;
+        // leaf fast-path
+        if self.children.is_empty() {
+            self.dirty.child_dirty = false;
+            return self.cached_size;
+        }
+
+        let style = self.style();
+        let avail = glam::Vec2::new(max_width, f32::INFINITY) - style.padding_total();
+
+        match style.display {
+            Display::Block => {
+                let mut y = style.padding.y;
+                for child in &mut self.children {
+                    let sz = child.layout(avail.x);
+                    child.layout_rect =
+                        Rect::new(self.layout_rect.origin + glam::vec2(style.padding.x, y), sz);
+                    y += sz.y;
+                }
+                self.cached_size = glam::vec2(max_width, y) + style.padding_total();
+            }
+            Display::Flex => {
+                let sz = crate::layout::flexbox::compute(
+                    style.flex.dir,
+                    style.flex.justify,
+                    style.flex.align,
+                    &mut self.children[..],
+                    avail,
+                );
+                self.cached_size = sz + style.padding_total();
+            }
+            Display::Grid => {
+                let sz = crate::layout::grid::compute(style.grid, &mut self.children[..], avail);
+                self.cached_size = sz + style.padding_total();
             }
         }
 

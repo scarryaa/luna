@@ -14,6 +14,16 @@ pub struct Button {
     pub hovered: bool,
 }
 
+impl Button {
+    pub fn label<S: Into<String>>(txt: S) -> Self {
+        Self {
+            label: txt.into(),
+            on_click: Rc::new(RefCell::new(|| {})),
+            hovered: false,
+        }
+    }
+}
+
 impl Widget for Button {
     fn measure(&self, _max_width: f32) -> Vec2 {
         // 8 px horizontal padding each side, 4 px vertical

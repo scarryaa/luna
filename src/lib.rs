@@ -7,9 +7,9 @@ pub mod widgets;
 pub mod windowing;
 
 pub use app::{App, AppBuilder};
-pub use layout::{Layout, LayoutNode};
+pub use layout::LayoutNode;
 pub use renderer::Renderer;
-pub use style::{Color, Style};
+pub use style::Style;
 pub use widgets::{Button, Text, Widget};
 pub use windowing::{Window, WindowBuilder};
 

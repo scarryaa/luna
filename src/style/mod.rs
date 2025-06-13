@@ -1,4 +1,2 @@
 pub mod properties;
-
-pub struct Style;
-pub struct Color;
+pub use properties::*;

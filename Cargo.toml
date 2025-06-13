@@ -25,6 +25,14 @@ path = "examples/immediate.rs"
 name = "retained"
 path = "examples/retained.rs"
 
+[[example]]
+name = "flex"
+path = "examples/flex.rs"
+
+[[example]]
+name = "grid"
+path = "examples/grid.rs"
+
 [lib]
 name = "luna"
 path = "src/lib.rs"

@@ -1,4 +1,5 @@
 use super::BuildCtx;
+use crate::style::Style;
 use crate::{Renderer, layout::Rect};
 use glam::Vec2;
 use winit::event::WindowEvent;
@@ -17,6 +18,10 @@ pub trait Widget: WidgetClone {
     }
 
     fn input(&mut self, _event: &WindowEvent) {}
+
+    fn style(&self) -> Style {
+        Style::default()
+    }
 }
 
 pub trait WidgetClone {
@@ -26,5 +31,11 @@ pub trait WidgetClone {
 impl<T: Widget + Clone + 'static> WidgetClone for T {
     fn box_clone(&self) -> Box<dyn Widget> {
         Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Widget> {
+    fn clone(&self) -> Self {
+        self.as_ref().box_clone()
     }
 }

@@ -1,4 +1,5 @@
 use glam::Vec2;
+use winit::keyboard::ModifiersState;
 use winit::{event::MouseButton, keyboard::Key};
 
 #[derive(Clone, Debug)]
@@ -32,6 +33,7 @@ pub struct EventCtx<'a> {
     stopped: bool,
     default_prevented: bool,
     pub layout_requested: bool,
+    pub modifiers: ModifiersState,
 }
 
 impl<'a> EventCtx<'a> {
@@ -56,6 +58,7 @@ impl<'a> EventCtx<'a> {
         focus: &'a mut FocusManager,
         path: &'a [usize],
         node_layout: crate::layout::Rect,
+        modifiers: ModifiersState,
     ) -> Self {
         Self {
             phase,
@@ -65,6 +68,7 @@ impl<'a> EventCtx<'a> {
             stopped: false,
             default_prevented: false,
             layout_requested: false,
+            modifiers,
         }
     }
 }
@@ -73,6 +77,7 @@ impl<'a> EventCtx<'a> {
 pub struct FocusManager {
     focused_path: Vec<usize>,
     change_request: Option<Vec<usize>>,
+    pub modifiers: ModifiersState,
 }
 
 impl FocusManager {

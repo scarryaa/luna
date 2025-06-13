@@ -16,6 +16,7 @@ tokio = "1.45.1"
 env_logger = "0.11.8"
 log = "0.4.27"
 bytemuck = "1.23.1"
+arboard = "3.5.0"
 
 [build-dependencies]
 serde = { version = "1.0.219", features = ["derive"] }

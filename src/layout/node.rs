@@ -192,6 +192,10 @@ impl Node {
         focus: &mut FocusManager,
         scale_factor: f64,
     ) {
+        if let WindowEvent::ModifiersChanged(new_mods) = event {
+            focus.modifiers = new_mods.state();
+        }
+
         match *event {
             WindowEvent::CursorMoved { position, .. } => {
                 let logical_pos: winit::dpi::LogicalPosition<f32> =
@@ -295,7 +299,13 @@ impl Node {
 
     fn send_to_path(node: &mut Node, path: &[usize], kind: EventKind, focus: &mut FocusManager) {
         for &phase in &[Phase::Capture, Phase::Target, Phase::Bubble] {
-            let mut ctx = EventCtx::new(phase, focus, path, Rect::new(Vec2::ZERO, Vec2::ZERO));
+            let mut ctx = EventCtx::new(
+                phase,
+                focus,
+                path,
+                Rect::new(Vec2::ZERO, Vec2::ZERO),
+                focus.modifiers,
+            );
             node.dispatch(path, 0, phase, &kind, &mut ctx);
         }
     }

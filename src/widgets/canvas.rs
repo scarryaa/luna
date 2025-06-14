@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use glam::Vec2;
 
-use crate::{layout::node::Node, renderer::Renderer, widgets::Widget};
+use crate::{layout::node::Node, renderer::Renderer, style::Theme, widgets::Widget};
 
 #[derive(Clone)]
 pub struct Canvas {
@@ -22,11 +22,11 @@ impl Widget for Canvas {
         Vec::new()
     }
 
-    fn measure(&self, _max_width: f32) -> Vec2 {
+    fn measure(&self, _max_width: f32, _theme: &Theme) -> Vec2 {
         Vec2::ZERO
     }
 
-    fn paint(&mut self, _node: &mut Node, ren: &mut Renderer) {
+    fn paint(&mut self, _node: &mut Node, ren: &mut Renderer, _theme: &Theme) {
         (self.on_paint.borrow_mut())(ren);
     }
 }

@@ -1,8 +1,7 @@
 use glam::{Vec2, vec2};
 
-use crate::Renderer;
 use crate::layout::node::Node;
-use crate::style::tokens::Spacing;
+use crate::{Renderer, style::Theme};
 
 use super::{BuildCtx, Widget};
 
@@ -15,7 +14,7 @@ impl Default for Column {
     fn default() -> Self {
         Self {
             children: Vec::new(),
-            spacing: Spacing::SM,
+            spacing: 4.0,
         }
     }
 }
@@ -25,12 +24,12 @@ impl Widget for Column {
         self.children.iter().map(|w| w.box_clone()).collect()
     }
 
-    fn measure(&self, max_width: f32) -> Vec2 {
+    fn measure(&self, max_width: f32, theme: &Theme) -> Vec2 {
         let mut w: f32 = 0.0;
         let mut h = 0.0;
 
         for (i, child) in self.children.iter().enumerate() {
-            let sz = child.measure(max_width);
+            let sz = child.measure(max_width, theme);
             w = w.max(sz.x);
             h += sz.y;
 
@@ -41,10 +40,10 @@ impl Widget for Column {
         vec2(w, h)
     }
 
-    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer, theme: &Theme) {
         for child in &mut node.children {
             if child.layout_rect.intersects(&node.layout_rect) {
-                child.collect(ren);
+                child.collect(ren, theme);
             }
         }
     }

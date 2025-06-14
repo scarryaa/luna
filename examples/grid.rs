@@ -1,25 +1,27 @@
 use luna::{
     App, Element, Result,
-    style::{Display, tokens::Colour},
-    widgets::{Button, Widget},
+    style::Theme,
+    style::{Align, Display, FlexDir, Justify},
+    widgets::Button,
 };
 
 fn main() -> Result<()> {
-    let buttons: Vec<Box<dyn Widget>> = (1..=9)
-        .map(|i| Box::new(Button::label(&format!("Button {i}"))) as Box<dyn Widget>)
-        .collect();
+    let theme = Theme::default();
 
     let ui = Element::new()
-        .display(Display::Grid)
-        .background_color(Colour::SURFACE)
+        .display(Display::Flex)
+        .flex_direction(FlexDir::Row)
+        .justify_content(Justify::SpaceBetween)
+        .align_items(Align::Center)
         .padding(12.0)
-        .gap(8.0)
-        .grid_cols(3)
-        .grid_row_height(32.0)
-        .children(buttons);
+        .background_color(theme.color.surface)
+        .child(Button::label("One"))
+        .child(Button::label("Two"))
+        .child(Button::label("Three"));
 
     App::new(ui)
-        .with_title("Grid Demo")
-        .with_size(480, 200)
+        .with_title("Flex Demo")
+        .with_size(640, 120)
+        .with_theme(theme)
         .run()
 }

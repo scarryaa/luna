@@ -1,6 +1,6 @@
 use super::BuildCtx;
 use crate::layout::node::Node;
-use crate::style::Style;
+use crate::style::{Style, Theme};
 use crate::windowing::events::{EventCtx, EventKind};
 use crate::{Renderer, layout::Rect};
 use glam::Vec2;
@@ -11,9 +11,9 @@ pub trait Widget: WidgetClone {
         Vec::new()
     }
 
-    fn measure(&self, max_width: f32) -> Vec2;
+    fn measure(&self, max_width: f32, theme: &Theme) -> Vec2;
 
-    fn paint(&mut self, node: &mut Node, ren: &mut Renderer);
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer, theme: &Theme);
 
     fn event(&mut self, _ctx: &mut EventCtx, _ev: &EventKind) {}
 

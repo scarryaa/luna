@@ -1,4 +1,4 @@
-use crate::layout::node::Node;
+use crate::{layout::node::Node, style::Theme};
 use glam::{Vec2, Vec4, vec2};
 
 use crate::{
@@ -85,11 +85,11 @@ impl Widget for Element {
         self.style
     }
 
-    fn measure(&self, _max_width: f32) -> Vec2 {
+    fn measure(&self, _max_width: f32, _theme: &Theme) -> Vec2 {
         Vec2::ZERO
     }
 
-    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer, theme: &Theme) {
         if let Some(color) = self.style.background_color {
             let id = *self.bg_id.get_or_insert_with(|| ren.alloc_rect());
             ren.update_rect(
@@ -105,7 +105,7 @@ impl Widget for Element {
 
         for child in &mut node.children {
             if child.layout_rect.intersects(&node.layout_rect) {
-                child.collect(ren);
+                child.collect(ren, theme);
             }
         }
     }

@@ -4,6 +4,7 @@ use glam::{Vec2, vec2};
 use winit::event::{ElementState, Ime, MouseScrollDelta, WindowEvent};
 
 use crate::signals::{NodeId, ScopedNodeContext};
+use crate::style::Theme;
 use crate::{
     layout::{Dirty, Rect},
     renderer::Renderer,
@@ -55,7 +56,7 @@ impl Node {
         }
     }
 
-    pub fn layout(&mut self, max_width: f32) -> Vec2 {
+    pub fn layout(&mut self, max_width: f32, theme: &Theme) -> Vec2 {
         if !self.dirty.self_dirty && !self.dirty.child_dirty {
             return self.cached_size;
         }
@@ -63,7 +64,7 @@ impl Node {
         self.dirty.paint_dirty = true;
 
         if self.dirty.self_dirty {
-            self.cached_size = self.widget.measure(max_width);
+            self.cached_size = self.widget.measure(max_width, theme);
         }
 
         if self.children.is_empty() {
@@ -76,7 +77,7 @@ impl Node {
         let avail = vec2(max_width, self.layout_rect.size.y) - style.padding_total();
 
         for child in &mut self.children {
-            child.layout(avail.x);
+            child.layout(avail.x, theme);
         }
 
         let content_origin = self.layout_rect.origin + style.padding_tl();
@@ -108,6 +109,7 @@ impl Node {
                     &mut self.children,
                     avail,
                     content_origin,
+                    theme,
                 );
                 self.cached_size = sz + style.padding_total();
             }
@@ -118,7 +120,7 @@ impl Node {
         self.cached_size
     }
 
-    pub fn collect(&mut self, ren: &mut Renderer) {
+    pub fn collect(&mut self, ren: &mut Renderer, theme: &Theme) {
         let _guard = ScopedNodeContext::new(self.id);
 
         let mut widget = mem::replace(
@@ -126,8 +128,7 @@ impl Node {
             Box::new(crate::widgets::Element::default()),
         );
 
-        widget.paint(self, ren);
-
+        widget.paint(self, ren, theme);
         self.widget = widget;
 
         self.dirty.paint_dirty = false;

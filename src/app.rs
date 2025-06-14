@@ -3,6 +3,7 @@ use crate::{
     layout::{Rect, node::Node},
     renderer::Renderer,
     signals,
+    style::Theme,
     widgets::{BuildCtx, Widget},
     windowing::events::FocusManager,
 };
@@ -31,6 +32,7 @@ impl Default for WindowConfig {
 pub struct App {
     root_widget: Box<dyn Widget>,
     window_config: WindowConfig,
+    theme: Arc<Theme>,
 }
 
 impl App {
@@ -38,6 +40,7 @@ impl App {
         Self {
             root_widget: Box::new(root_widget),
             window_config: WindowConfig::default(),
+            theme: Arc::new(Theme::default()),
         }
     }
 
@@ -48,6 +51,11 @@ impl App {
 
     pub fn with_size(mut self, width: u32, height: u32) -> Self {
         self.window_config.size = winit::dpi::LogicalSize::new(width, height);
+        self
+    }
+
+    pub fn with_theme(mut self, theme: Theme) -> Self {
+        self.theme = Arc::new(theme);
         self
     }
 
@@ -96,8 +104,8 @@ impl App {
                     event: WindowEvent::RedrawRequested,
                 } if *window_id == window.id() => {
                     renderer.begin_frame();
-                    root.layout(win_width);
-                    root.collect(&mut renderer);
+                    root.layout(win_width, &self.theme);
+                    root.collect(&mut renderer, &self.theme);
 
                     if let Err(e) = renderer.end_frame() {
                         log::error!("frame error: {e}");
@@ -117,6 +125,7 @@ impl App {
                                 vec2(sz.width as f32, sz.height as f32),
                             ));
                             root.mark_dirty();
+                            root.layout(sz.width as f32, &self.theme);
                         }
                         _ => {}
                     }

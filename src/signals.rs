@@ -189,3 +189,15 @@ impl Drop for ScopedNodeContext {
 pub fn init_reactivity(tx: mpsc::Sender<NodeId>) {
     DIRTY_NODES_TX.with(|tx_cell| *tx_cell.borrow_mut() = Some(tx));
 }
+
+impl From<String> for ReadSignal<String> {
+    fn from(s: String) -> Self {
+        create_signal(s).0
+    }
+}
+
+impl<'a> From<&'a str> for ReadSignal<String> {
+    fn from(s: &'a str) -> Self {
+        create_signal(s.to_string()).0
+    }
+}

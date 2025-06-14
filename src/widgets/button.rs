@@ -1,4 +1,5 @@
 use crate::layout::node::Node;
+use crate::style::Theme;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -11,7 +12,6 @@ use crate::{
     Renderer,
     layout::Rect,
     renderer::{RectId, RenderPrimative, primatives::RectInstance},
-    style::tokens::{Colour, Radius, Spacing, Typography},
     windowing::events::{EventCtx, EventKind, Phase},
 };
 
@@ -46,29 +46,23 @@ impl Button {
     }
 }
 
-impl From<&str> for ReadSignal<String> {
-    fn from(s: &str) -> Self {
-        create_signal(s.to_string()).0
-    }
-}
-
 impl Widget for Button {
-    fn measure(&self, _max_width: f32) -> Vec2 {
+    fn measure(&self, _max_width: f32, theme: &Theme) -> Vec2 {
         let text = self.label.get();
-        let text_w = text.len() as f32 * 0.6 * Typography::BODY;
+        let text_w = text.len() as f32 * 0.6 * theme.typography.body;
         vec2(
-            text_w + Spacing::MD * 2.0,
-            Typography::BODY + Spacing::SM * 2.0,
+            text_w + theme.spacing.md * 2.0,
+            theme.typography.body + theme.spacing.sm * 2.0,
         )
     }
 
-    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer, theme: &Theme) {
         let layout = node.layout_rect;
 
         let bg_color = if self.hovered {
-            Vec4::from(Colour::PRIMARY_HOVER)
+            Vec4::from(theme.color.primary_hover)
         } else {
-            Vec4::from(Colour::PRIMARY)
+            Vec4::from(theme.color.primary)
         };
 
         let id = *self.bg_id.get_or_insert_with(|| ren.alloc_rect());
@@ -79,19 +73,18 @@ impl Widget for Button {
                 pos: layout.origin.to_array(),
                 size: layout.size.to_array(),
                 color: bg_color.to_array(),
-                radius: Radius::MD,
+                radius: theme.radius.md,
                 z: 0.0,
                 _pad: 0.0,
             },
         );
 
-        let txt_pos = layout.origin + vec2(Spacing::MD, Spacing::SM);
-
+        let txt_pos = layout.origin + vec2(theme.spacing.md, theme.spacing.sm);
         let text_prim = RenderPrimative::text(
             &self.label.get(),
             txt_pos,
-            Vec4::from(Colour::TEXT),
-            Typography::BODY,
+            Vec4::from(theme.color.text),
+            theme.typography.body,
         );
 
         if let Some(label_id) = self.label_id {

@@ -6,11 +6,14 @@ pub mod rect;
 
 pub use dirty::Dirty;
 pub use rect::Rect;
+
+use crate::style::Theme;
+
 pub struct LayoutNode(pub super::layout::node::Node);
 
 impl LayoutNode {
-    pub fn layout(&mut self, max_w: f32) -> glam::Vec2 {
-        self.0.layout(max_w)
+    pub fn layout(&mut self, max_w: f32, theme: &Theme) -> glam::Vec2 {
+        self.0.layout(max_w, theme)
     }
 
     pub fn cached_size(&self) -> glam::Vec2 {

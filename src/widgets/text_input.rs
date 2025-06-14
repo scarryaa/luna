@@ -6,14 +6,12 @@ use glam::{Vec2, Vec4, vec2};
 use winit::keyboard::ModifiersState;
 use winit::keyboard::{Key, NamedKey};
 
+use crate::style::Theme;
 use crate::{
     Widget,
     layout::{Rect, node::Node},
     renderer::{RectId, Renderer, primatives::RectInstance},
-    style::{
-        Style,
-        tokens::{Colour, Radius, Spacing, Typography},
-    },
+    style::Style,
     windowing::events::{EventCtx, EventKind, Phase},
 };
 
@@ -126,22 +124,22 @@ impl TextInput {
 impl Widget for TextInput {
     fn style(&self) -> Style {
         Style {
-            padding: vec2(Spacing::MD, Spacing::MD),
+            padding: vec2(8.0, 8.0),
             ..Default::default()
         }
     }
 
-    fn measure(&self, _max_width: f32) -> Vec2 {
-        vec2(100.0, Typography::BODY + Spacing::MD * 2.0)
+    fn measure(&self, _max_width: f32, theme: &Theme) -> Vec2 {
+        vec2(100.0, theme.typography.body + theme.spacing.md * 2.0)
     }
 
-    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer, theme: &Theme) {
         let layout = node.layout_rect;
 
         let bg_color = if self.focused {
-            Vec4::from(Colour::PRIMARY_HOVER)
+            Vec4::from(theme.color.primary_hover)
         } else {
-            Vec4::from(Colour::SURFACE)
+            Vec4::from(theme.color.surface)
         };
         let bg_id = *self.bg_id.get_or_insert_with(|| ren.alloc_rect());
         ren.update_rect(
@@ -150,12 +148,12 @@ impl Widget for TextInput {
                 pos: layout.origin.to_array(),
                 size: layout.size.to_array(),
                 color: bg_color.to_array(),
-                radius: Radius::MD,
+                radius: theme.radius.md,
                 ..Default::default()
             },
         );
 
-        let padding = Spacing::MD;
+        let padding = theme.spacing.md;
         let content_area = Rect::new(
             layout.origin + padding,
             layout.size - vec2(padding * 2.0, padding * 2.0),
@@ -168,7 +166,7 @@ impl Widget for TextInput {
         let text_color = if self.value.is_empty() && !self.focused {
             Vec4::new(0.5, 0.5, 0.5, 1.0)
         } else {
-            Vec4::from(Colour::TEXT)
+            Vec4::from(theme.color.text)
         };
 
         let selection_instance_data: Option<RectInstance>;
@@ -184,7 +182,7 @@ impl Widget for TextInput {
 
         {
             let (font_system, swash_cache) = ren.font_and_swash_cache();
-            let metrics = Metrics::new(Typography::BODY, Typography::BODY * 1.2);
+            let metrics = Metrics::new(theme.typography.body, theme.typography.body * 1.2);
             let mut text_buffer = Buffer::new(font_system, metrics);
             let mut buffer_mut = text_buffer.borrow_with(font_system);
             buffer_mut.set_text(text_to_draw, &Attrs::new(), Shaping::Advanced);
@@ -219,7 +217,7 @@ impl Widget for TextInput {
                             content_area.origin.x + start_x - self.scroll_offset,
                             content_area.origin.y,
                         ),
-                        vec2(end_x - start_x, Typography::BODY),
+                        vec2(end_x - start_x, theme.typography.body),
                     );
 
                     let clipped_rect = content_area.intersection(&full_selection_rect);
@@ -279,8 +277,8 @@ impl Widget for TextInput {
                     {
                         Some(RectInstance {
                             pos: cursor_abs_pos.to_array(),
-                            size: [2.0, Typography::BODY],
-                            color: Vec4::from(Colour::TEXT).to_array(),
+                            size: [2.0, theme.typography.body],
+                            color: Vec4::from(theme.color.text).to_array(),
                             radius: 1.0,
                             ..Default::default()
                         })

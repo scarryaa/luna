@@ -1,8 +1,17 @@
 use super::node::Node;
-use crate::{layout::Rect, style::Grid};
+use crate::{
+    layout::Rect,
+    style::{Grid, Theme},
+};
 use glam::{Vec2, vec2};
 
-pub fn compute(grid: Grid, children: &mut [Node], avail: Vec2, content_origin: Vec2) -> Vec2 {
+pub fn compute(
+    grid: Grid,
+    children: &mut [Node],
+    avail: Vec2,
+    content_origin: Vec2,
+    theme: &Theme,
+) -> Vec2 {
     let cw = (avail.x - grid.gap.x * (grid.cols - 1) as f32) / grid.cols as f32;
     let mut max_y: f32 = 0.0;
 
@@ -14,7 +23,7 @@ pub fn compute(grid: Grid, children: &mut [Node], avail: Vec2, content_origin: V
             r as f32 * (grid.row_height + grid.gap.y),
         );
         let pos = content_origin + offset;
-        let sz = n.layout(cw);
+        let sz = n.layout(cw, theme);
         n.set_rect(Rect::new(pos, vec2(cw, grid.row_height.max(sz.y))));
         max_y = max_y.max(pos.y + grid.row_height.max(sz.y) - content_origin.y);
     }

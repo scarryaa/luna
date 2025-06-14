@@ -1,20 +1,21 @@
 use luna::{
     App, Button, Element, Result, Text,
     signals::{create_memo, create_signal},
-    style::{Align, Display, FlexDir, Justify, tokens::Colour},
+    style::{Display, FlexDir, Theme},
 };
 
 fn main() -> Result<()> {
+    let theme = Theme::default();
     let (count, set_count) = create_signal(0);
-
-    let label_memo = create_memo({
-        let count = count.clone();
-        move || format!("Click me: {}", count.get())
-    });
 
     let heading_memo = create_memo({
         let count = count.clone();
         move || format!("Current count is: {}", count.get())
+    });
+
+    let label_memo = create_memo({
+        let count = count.clone();
+        move || format!("Click me: {}", count.get())
     });
 
     let on_click_action = move || {
@@ -25,15 +26,11 @@ fn main() -> Result<()> {
     let app_ui = Element::new()
         .display(Display::Flex)
         .flex_direction(FlexDir::Column)
-        .justify_content(Justify::Center)
-        .align_items(Align::Center)
+        .justify_content(luna::style::Justify::Center)
+        .align_items(luna::style::Align::Center)
         .gap(16.0)
-        .background_color(Colour::SURFACE)
-        .child(Text {
-            content: heading_memo,
-            color: Colour::TEXT.into(),
-            size: 24.0,
-        })
+        .background_color(theme.color.surface)
+        .child(Text::new(heading_memo).with_size(24.0))
         .child(Button::new(label_memo).on_click(on_click_action));
 
     App::new(app_ui)

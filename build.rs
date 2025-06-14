@@ -1,27 +1,41 @@
-use std::{env, fs, path::PathBuf};
-
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::{env, fs, path::PathBuf};
+
+const TOKENS_YAML: &str = "tokens.yaml";
+const GENERATED_RS: &str = "tokens.rs";
+const DESIGN_JSON: &str = "tokens.design.json";
+const ASSETS_JSON: &str = "assets/design/tokens.json";
 
 fn main() -> Result<()> {
-    println!("cargo:rerun-if-changed=tokens.yaml");
+    println!("cargo:rerun-if-changed={}", TOKENS_YAML);
 
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
-    let yaml_src = fs::read_to_string(manifest_dir.join("tokens.yaml"))
-        .with_context(|| "reading tokens.yaml")?;
-
-    let raw: RawTokens = serde_yaml::from_str(&yaml_src).with_context(|| "parsing YAML")?;
-
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
-    fs::write(out_dir.join("tokens.rs"), render_rust(&raw))
-        .with_context(|| "writing generated Rust")?;
 
-    let json_engine = out_dir.join("tokens.design.json");
-    fs::write(&json_engine, serde_json::to_string_pretty(&raw)?).with_context(|| "writing JSON")?;
+    let yaml_src = fs::read_to_string(manifest_dir.join(TOKENS_YAML))
+        .with_context(|| format!("reading {TOKENS_YAML}"))?;
 
-    let json_repo = manifest_dir.join("assets/design/tokens.json");
-    fs::create_dir_all(json_repo.parent().unwrap())?;
-    fs::copy(&json_engine, &json_repo).with_context(|| "copying JSON into assets/")?;
+    let raw: RawTokens =
+        serde_yaml::from_str(&yaml_src).with_context(|| format!("parsing {TOKENS_YAML}"))?;
+
+    // Write generated Rust
+    let generated_rs_path = out_dir.join(GENERATED_RS);
+    fs::write(&generated_rs_path, render_rust(&raw))
+        .with_context(|| format!("writing generated Rust to {:?}", generated_rs_path))?;
+
+    // Write JSON for engine
+    let json_engine = out_dir.join(DESIGN_JSON);
+    fs::write(&json_engine, serde_json::to_string_pretty(&raw)?)
+        .with_context(|| format!("writing JSON to {:?}", json_engine))?;
+
+    // Copy JSON to assets
+    let json_repo = manifest_dir.join(ASSETS_JSON);
+    if let Some(parent) = json_repo.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("creating directory {:?}", parent))?;
+    }
+    fs::copy(&json_engine, &json_repo)
+        .with_context(|| format!("copying JSON into assets at {:?}", json_repo))?;
 
     Ok(())
 }
@@ -185,9 +199,9 @@ fn render_rust(raw: &RawTokens) -> String {
 fn fmt_f32<T: Into<f64>>(v: T) -> String {
     let n = v.into();
     if n.fract() == 0.0 {
-        format!("{n}.0") // 2   -> "2.0"
+        format!("{n}.0")
     } else {
-        format!("{n}") // 2.5 -> "2.5"
+        format!("{n}")
     }
 }
 

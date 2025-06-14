@@ -1,30 +1,24 @@
 use luna::{
     App, Button, Element, Result, Text,
-    signals::create_signal,
+    signals::{create_memo, create_signal},
     style::{Align, Display, FlexDir, Justify, tokens::Colour},
 };
 
 fn main() -> Result<()> {
     let (count, set_count) = create_signal(0);
 
-    let label_signal = {
+    let label_memo = create_memo({
         let count = count.clone();
-        create_signal(format!("Click me: {}", count.get()))
-    };
+        move || format!("Click me: {}", count.get())
+    });
 
-    let heading_signal = {
+    let heading_memo = create_memo({
         let count = count.clone();
-        create_signal(format!("Current count is: {}", count.get()))
-    };
+        move || format!("Current count is: {}", count.get())
+    });
 
     let on_click_action = move || {
         set_count.update(|c| *c += 1);
-
-        label_signal.1.set(format!("Click me: {}", count.get()));
-        heading_signal
-            .1
-            .set(format!("Current count is: {}", count.get()));
-
         log::info!("Clicked! New count: {}", count.get());
     };
 
@@ -36,11 +30,11 @@ fn main() -> Result<()> {
         .gap(16.0)
         .background_color(Colour::SURFACE)
         .child(Text {
-            content: heading_signal.0,
+            content: heading_memo,
             color: Colour::TEXT.into(),
             size: 24.0,
         })
-        .child(Button::new(label_signal.0).on_click(on_click_action));
+        .child(Button::new(label_memo).on_click(on_click_action));
 
     App::new(app_ui)
         .with_title("Retained Demo")

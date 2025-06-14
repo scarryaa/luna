@@ -2,6 +2,7 @@ pub mod app;
 pub mod debug;
 pub mod layout;
 pub mod renderer;
+pub mod signals;
 pub mod style;
 pub mod text;
 pub mod widgets;

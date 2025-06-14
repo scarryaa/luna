@@ -5,6 +5,7 @@ use glam::{Vec2, Vec4, vec2};
 use winit::event::{ElementState, MouseButton, WindowEvent};
 
 use super::base::Widget;
+use crate::signals::{ReadSignal, create_signal};
 use crate::{
     Renderer,
     layout::{Rect, node::Node},
@@ -15,7 +16,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Button {
-    pub label: String,
+    pub label: ReadSignal<String>,
     pub on_click: Rc<RefCell<dyn FnMut()>>,
     pub hovered: bool,
     bg_id: Option<RectId>,
@@ -23,14 +24,19 @@ pub struct Button {
 }
 
 impl Button {
-    pub fn label<S: Into<String>>(txt: S) -> Self {
+    pub fn new(label: impl Into<ReadSignal<String>>) -> Self {
         Self {
-            label: txt.into(),
+            label: label.into(),
             on_click: Rc::new(RefCell::new(|| {})),
             hovered: false,
             bg_id: None,
             label_id: None,
         }
+    }
+
+    pub fn label(txt: &str) -> Self {
+        let (read_label, _) = create_signal(txt.to_string());
+        Self::new(read_label)
     }
 
     pub fn on_click(mut self, handler: impl FnMut() + 'static) -> Self {
@@ -39,9 +45,16 @@ impl Button {
     }
 }
 
+impl From<&str> for ReadSignal<String> {
+    fn from(s: &str) -> Self {
+        create_signal(s.to_string()).0
+    }
+}
+
 impl Widget for Button {
     fn measure(&self, _max_width: f32) -> Vec2 {
-        let text_w = self.label.len() as f32 * 0.6 * Typography::BODY;
+        let text = self.label.get();
+        let text_w = text.len() as f32 * 0.6 * Typography::BODY;
         vec2(
             text_w + Spacing::MD * 2.0,
             Typography::BODY + Spacing::SM * 2.0,
@@ -72,7 +85,7 @@ impl Widget for Button {
         let txt_pos = layout.origin + vec2(Spacing::MD, Spacing::SM);
 
         let text_prim = RenderPrimative::text(
-            &self.label,
+            &self.label.get(),
             txt_pos,
             Vec4::from(Colour::TEXT),
             Typography::BODY,

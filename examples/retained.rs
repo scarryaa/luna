@@ -1,5 +1,9 @@
 use glam::vec2;
-use luna::{layout::node::Node, windowing::events::FocusManager};
+use luna::{
+    layout::node::Node,
+    signals::{self, create_signal},
+    windowing::events::FocusManager,
+};
 use std::sync::Arc;
 use winit::{
     event::{Event, WindowEvent},
@@ -31,7 +35,24 @@ fn main() -> Result<()> {
     let mut renderer =
         pollster::block_on(Renderer::new(&cloned_window, window.scale_factor() as f32))?;
 
-    let button = Button::label("Click").on_click(|| log::info!("clicked!"));
+    let (dirty_tx, dirty_rx) = std::sync::mpsc::channel();
+    signals::init_reactivity(dirty_tx);
+
+    let (count, set_count) = create_signal(0);
+
+    let label = {
+        let count = count.clone();
+        move || format!("Click me: {}", count.get())
+    };
+    let (read_label, write_label) = create_signal(label());
+
+    let on_click_action = move || {
+        set_count.update(|c| *c += 1);
+        write_label.set(label());
+        log::info!("Clicked! New count: {}", count.get());
+    };
+
+    let button = Button::new(read_label).on_click(on_click_action);
 
     let root_widget = Column {
         spacing: 8.0,
@@ -42,10 +63,14 @@ fn main() -> Result<()> {
         Box::new(root_widget),
         Rect {
             origin: vec2(50.0, 50.0),
-            size: vec2(140.0, 80.0),
+            size: vec2(160.0, 80.0),
         },
         &mut BuildCtx,
     );
+
+    for dirty_node_id in dirty_rx.try_iter() {
+        root.mark_dirty_by_id(dirty_node_id);
+    }
 
     let mut win_width = window.inner_size().width as f32;
     let mut focus_mgr = FocusManager::default();
@@ -56,7 +81,6 @@ fn main() -> Result<()> {
             event: WindowEvent::RedrawRequested,
         } if *window_id == window.id() => {
             renderer.begin_frame();
-
             root.layout(win_width);
             root.collect(&mut renderer);
 
@@ -68,12 +92,11 @@ fn main() -> Result<()> {
         Event::WindowEvent { window_id, event } if *window_id == window.id() => {
             match event {
                 WindowEvent::CloseRequested => elwt.exit(),
-
                 WindowEvent::Resized(sz) => {
                     win_width = sz.width as f32;
                     renderer.resize(*sz);
+                    root.mark_dirty();
                 }
-
                 _ => {}
             }
             root.route_window_event(event, &mut focus_mgr, window.scale_factor());

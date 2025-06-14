@@ -1,6 +1,7 @@
 use glam::{Vec2, vec2};
 use winit::event::{ElementState, Ime, MouseScrollDelta, WindowEvent};
 
+use crate::signals::{NodeId, ScopedNodeContext};
 use crate::{
     layout::{Dirty, Rect},
     renderer::Renderer,
@@ -18,6 +19,7 @@ pub enum PrimId {
 }
 
 pub struct Node {
+    pub id: NodeId,
     pub widget: Box<dyn Widget>,
     children: Vec<Node>,
 
@@ -29,6 +31,7 @@ pub struct Node {
 
 impl Node {
     pub fn new(widget: Box<dyn Widget>, layout: Rect, ctx: &mut BuildCtx) -> Self {
+        let id = NodeId::new();
         let kids = widget
             .build(ctx)
             .into_iter()
@@ -36,6 +39,7 @@ impl Node {
             .collect();
 
         Self {
+            id,
             widget,
             children: kids,
             layout_rect: layout,
@@ -113,6 +117,8 @@ impl Node {
     }
 
     pub fn collect(&mut self, ren: &mut Renderer) {
+        let _guard = ScopedNodeContext::new(self.id);
+
         if self.dirty.paint_dirty {
             self.widget.paint(&mut self.children, self.layout_rect, ren);
             self.dirty.paint_dirty = false;
@@ -121,6 +127,20 @@ impl Node {
                 child.collect(ren);
             }
         }
+    }
+
+    pub fn mark_dirty_by_id(&mut self, target_id: NodeId) -> bool {
+        if self.id == target_id {
+            self.mark_dirty();
+            return true;
+        }
+        for child in &mut self.children {
+            if child.mark_dirty_by_id(target_id) {
+                self.dirty.paint_dirty = true;
+                return true;
+            }
+        }
+        false
     }
 
     fn hittest(&self, pt: Vec2, path: &mut Vec<usize>) -> bool {

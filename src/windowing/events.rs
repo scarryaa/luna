@@ -81,12 +81,22 @@ pub struct FocusManager {
 }
 
 impl FocusManager {
+    pub fn is_path_focused(&self, path: &[usize]) -> bool {
+        if self.focused_path.is_empty() {
+            return false;
+        }
+
+        path.starts_with(&self.focused_path)
+    }
+
     pub fn request_focus(&mut self, path: &[usize]) {
         self.change_request = Some(path.to_vec());
     }
 
     pub fn blur(&mut self) {
-        self.change_request = Some(Vec::new());
+        if !self.focused_path.is_empty() {
+            self.change_request = Some(Vec::new());
+        }
     }
 
     pub fn path(&self) -> &[usize] {

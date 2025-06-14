@@ -54,6 +54,10 @@ path = "examples/text_input.rs"
 name = "image"
 path = "examples/image.rs"
 
+[[example]]
+name = "checkbox"
+path = "examples/checkbox.rs"
+
 [lib]
 name = "luna"
 path = "src/lib.rs"

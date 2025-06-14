@@ -13,7 +13,7 @@ pub use app::App;
 pub use layout::LayoutNode;
 pub use renderer::Renderer;
 pub use style::Style;
-pub use widgets::{Button, Canvas, Element, Image, Text, TextInput, Widget};
+pub use widgets::{Button, Canvas, Checkbox, Element, Image, Text, TextInput, Widget};
 pub use windowing::{Window, WindowBuilder};
 
 pub use glam::{Mat4, Vec2, Vec3, Vec4, vec2};

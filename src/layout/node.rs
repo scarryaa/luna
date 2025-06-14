@@ -248,6 +248,13 @@ impl Node {
                 if self.hover_path.is_empty() {
                     return;
                 }
+
+                if state == ElementState::Pressed {
+                    if !focus.is_path_focused(&self.hover_path) {
+                        focus.blur();
+                    }
+                }
+
                 let kind = match state {
                     ElementState::Pressed => EventKind::PointerDown {
                         button,

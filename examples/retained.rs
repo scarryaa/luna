@@ -1,7 +1,6 @@
 use luna::{
-    App, Button, Element, Result, Text,
+    Align, App, Button, Display, Element, FlexDir, Justify, Result, Text, Theme,
     signals::{create_memo, create_signal},
-    style::{Display, FlexDir, Theme},
 };
 
 fn main() -> Result<()> {
@@ -26,8 +25,8 @@ fn main() -> Result<()> {
     let app_ui = Element::new()
         .display(Display::Flex)
         .flex_direction(FlexDir::Column)
-        .justify_content(luna::style::Justify::Center)
-        .align_items(luna::style::Align::Center)
+        .justify_content(Justify::Center)
+        .align_items(Align::Center)
         .gap(16.0)
         .background_color(theme.color.surface)
         .child(Text::new(heading_memo).with_size(24.0))

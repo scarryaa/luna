@@ -1,26 +1,25 @@
 use crate::layout::node::Node;
 use crate::style::Theme;
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use glam::{Vec2, Vec4, vec2};
-use winit::event::{ElementState, MouseButton, WindowEvent};
+use winit::event::MouseButton;
 
 use super::base::Widget;
 use crate::signals::{ReadSignal, create_signal};
 use crate::{
     Renderer,
     layout::Rect,
-    renderer::{RectId, RenderPrimative, primatives::RectInstance},
+    renderer::{RenderPrimative, primatives::RectInstance},
     windowing::events::{EventCtx, EventKind, Phase},
 };
 
 #[derive(Clone)]
 pub struct Button {
     pub label: ReadSignal<String>,
-    pub on_click: Rc<RefCell<dyn FnMut()>>,
+    pub on_click: Rc<dyn Fn() + 'static>,
     pub hovered: bool,
-    bg_id: Option<RectId>,
+    bg_id: Option<usize>,
     label_id: Option<usize>,
 }
 
@@ -28,7 +27,7 @@ impl Button {
     pub fn new(label: impl Into<ReadSignal<String>>) -> Self {
         Self {
             label: label.into(),
-            on_click: Rc::new(RefCell::new(|| {})),
+            on_click: Rc::new(|| {}),
             hovered: false,
             bg_id: None,
             label_id: None,
@@ -40,8 +39,8 @@ impl Button {
         Self::new(read_label)
     }
 
-    pub fn on_click(mut self, handler: impl FnMut() + 'static) -> Self {
-        self.on_click = Rc::new(RefCell::new(handler));
+    pub fn on_click(mut self, handler: impl Fn() + 'static) -> Self {
+        self.on_click = Rc::new(handler);
         self
     }
 }
@@ -49,6 +48,7 @@ impl Button {
 impl Widget for Button {
     fn measure(&self, _max_width: f32, theme: &Theme) -> Vec2 {
         let text = self.label.get();
+        // TODO measure this accurately
         let text_w = text.len() as f32 * 0.6 * theme.typography.body;
         vec2(
             text_w + theme.spacing.md * 2.0,
@@ -119,22 +119,9 @@ impl Widget for Button {
                 button: MouseButton::Left,
                 ..
             } if ctx.phase == Phase::Target => {
-                (self.on_click.borrow_mut())();
+                (self.on_click)();
                 ctx.stop_propagation();
             }
-            _ => {}
-        }
-    }
-
-    fn input(&mut self, event: &WindowEvent) {
-        match *event {
-            WindowEvent::CursorMoved { .. } => self.hovered = true,
-            WindowEvent::CursorLeft { .. } => self.hovered = false,
-            WindowEvent::MouseInput {
-                state: ElementState::Released,
-                button: MouseButton::Left,
-                ..
-            } => (self.on_click.borrow_mut())(),
             _ => {}
         }
     }

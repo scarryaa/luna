@@ -19,6 +19,8 @@ pub use glam::{Mat4, Vec2, Vec3, Vec4, vec2};
 pub use winit::event::{Event, MouseButton, WindowEvent};
 pub use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
 
+pub use style::{Align, Display, FlexDir, Justify, Theme};
+
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub fn init_logging() {

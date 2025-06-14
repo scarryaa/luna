@@ -1,9 +1,4 @@
-use luna::{
-    App, Element, Result,
-    style::Theme,
-    style::{Align, Display, FlexDir, Justify},
-    widgets::Button,
-};
+use luna::{Align, App, Display, Element, FlexDir, Justify, Result, Theme, widgets::Button};
 
 fn main() -> Result<()> {
     let theme = Theme::default();

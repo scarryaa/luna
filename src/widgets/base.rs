@@ -4,7 +4,6 @@ use crate::style::{Style, Theme};
 use crate::windowing::events::{EventCtx, EventKind};
 use crate::{Renderer, layout::Rect};
 use glam::Vec2;
-use winit::event::WindowEvent;
 
 pub trait Widget: WidgetClone {
     fn build(&self, _ctx: &mut BuildCtx) -> Vec<Box<dyn Widget>> {
@@ -20,8 +19,6 @@ pub trait Widget: WidgetClone {
     fn hit_test(&self, _pt: Vec2, _layout: Rect) -> bool {
         false
     }
-
-    fn input(&mut self, _event: &WindowEvent) {}
 
     fn style(&self) -> Style {
         Style::default()

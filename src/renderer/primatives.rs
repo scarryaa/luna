@@ -27,7 +27,7 @@ pub enum RenderPrimative {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Default, PartialEq, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct RectInstance {
     pub pos: [f32; 2],
     pub size: [f32; 2],

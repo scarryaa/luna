@@ -2,6 +2,10 @@ pub mod gpu;
 pub mod primatives;
 pub mod surface;
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use anyhow::Result;
 use cosmic_text::{Attrs, Buffer, Color, FontSystem, Metrics, Shaping, SwashCache};
 use glam::{Vec2, Vec4};
 use primatives::{CircleInstance, LineInstance, RectInstance};
@@ -98,6 +102,11 @@ pub struct Renderer<'a> {
     screen_buf: wgpu::Buffer,
     screen_bind: wgpu::BindGroup,
 
+    image_pipe: wgpu::RenderPipeline,
+    texture_bind_group_layout: wgpu::BindGroupLayout,
+    texture_cache: HashMap<String, Arc<wgpu::BindGroup>>,
+    frame_image_draws: Vec<(Rect, Arc<wgpu::BindGroup>)>,
+
     rect_pipe: wgpu::RenderPipeline,
     line_pipe: wgpu::RenderPipeline,
     circle_pipe: wgpu::RenderPipeline,
@@ -128,7 +137,7 @@ pub struct Renderer<'a> {
 }
 
 impl<'a> Renderer<'a> {
-    pub async fn new(window: &'a winit::window::Window, scale_factor: f32) -> crate::Result<Self> {
+    pub async fn new(window: &'a winit::window::Window, scale_factor: f32) -> Result<Self> {
         use primatives::{CircleInstance, LineInstance, RectInstance};
 
         let gpu = GpuContext::new().await?;
@@ -143,6 +152,7 @@ impl<'a> Renderer<'a> {
                 contents: bytemuck::cast_slice(&[size.width as f32, size.height as f32]),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
+
         let screen_layout = gpu
             .device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -167,11 +177,36 @@ impl<'a> Renderer<'a> {
             }],
         });
 
+        // Layout for textures
+        let texture_bind_group_layout =
+            gpu.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                multisampled: false,
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                            count: None,
+                        },
+                    ],
+                    label: Some("texture_bind_group_layout"),
+                });
+
         fn make_pipeline(
             device: &wgpu::Device,
             src: &'static str,
             label: &'static str,
-            bind_layout: &wgpu::BindGroupLayout,
+            bind_layouts: &[&wgpu::BindGroupLayout],
             v_layout: wgpu::VertexBufferLayout<'static>,
             surface_fmt: wgpu::TextureFormat,
         ) -> wgpu::RenderPipeline {
@@ -181,7 +216,7 @@ impl<'a> Renderer<'a> {
             });
             let pipe_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("pipe-layout"),
-                bind_group_layouts: &[bind_layout],
+                bind_group_layouts: bind_layouts,
                 push_constant_ranges: &[],
             });
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -212,7 +247,7 @@ impl<'a> Renderer<'a> {
             &gpu.device,
             include_str!("shaders/rect.wgsl"),
             "rect.wgsl",
-            &screen_layout,
+            &[&screen_layout],
             RectInstance::layout(),
             surface_fmt,
         );
@@ -220,7 +255,7 @@ impl<'a> Renderer<'a> {
             &gpu.device,
             include_str!("shaders/line.wgsl"),
             "line.wgsl",
-            &screen_layout,
+            &[&screen_layout],
             LineInstance::layout(),
             surface_fmt,
         );
@@ -228,8 +263,16 @@ impl<'a> Renderer<'a> {
             &gpu.device,
             include_str!("shaders/circle.wgsl"),
             "circle.wgsl",
-            &screen_layout,
+            &[&screen_layout],
             CircleInstance::layout(),
+            surface_fmt,
+        );
+        let image_pipeline = make_pipeline(
+            &gpu.device,
+            include_str!("shaders/image.wgsl"),
+            "image.wgsl",
+            &[&screen_layout, &texture_bind_group_layout],
+            RectInstance::layout(),
             surface_fmt,
         );
 
@@ -248,34 +291,117 @@ impl<'a> Renderer<'a> {
             surface: surf,
             screen_buf,
             screen_bind,
+            image_pipe: image_pipeline,
+            texture_bind_group_layout,
+            texture_cache: HashMap::new(),
+            frame_image_draws: Vec::new(),
             rect_pipe: rect_pipeline,
             line_pipe: line_pipeline,
             circle_pipe: circle_pipeline,
-
             rect_ibuf,
             line_ibuf,
             circle_ibuf,
-
             font_system,
             swash_cache,
             text_pool: Vec::new(),
-
             rect_pool: Vec::new(),
             line_pool: Vec::new(),
             circ_pool: Vec::new(),
-
             rect_dirty: Vec::new(),
             line_dirty: Vec::new(),
             circ_dirty: Vec::new(),
-
             frame_rect_slots: Vec::new(),
             frame_text_ids: Vec::new(),
             rect_call_idx: 0,
             text_call_idx: 0,
-
             scissor_stack: Vec::new(),
             scale_factor,
         })
+    }
+
+    pub fn draw_image(&mut self, path: &str, rect: Rect) {
+        if let Ok(bind_group) = self.get_texture_bind_group(path) {
+            self.frame_image_draws.push((rect, bind_group.clone()));
+        } else {
+            log::error!("Failed to load or get texture for path: {}", path);
+            self.draw_rect(rect.origin, rect.size, Vec4::new(1.0, 0.0, 1.0, 1.0));
+        }
+    }
+
+    fn get_texture_bind_group(&mut self, path: &str) -> Result<Arc<wgpu::BindGroup>> {
+        if let Some(bg) = self.texture_cache.get(path) {
+            return Ok(bg.clone());
+        }
+
+        log::info!("Loading texture: {}", path);
+        let img = image::open(path)?.to_rgba8();
+        let (width, height) = img.dimensions();
+        let texture_size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+
+        let texture = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some(path),
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        self.gpu.queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &img,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
+            },
+            texture_size,
+        );
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = self.gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let bind_group = Arc::new(
+            self.gpu
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &self.texture_bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&sampler),
+                        },
+                    ],
+                    label: Some("texture_bind_group"),
+                }),
+        );
+
+        self.texture_cache
+            .insert(path.to_string(), bind_group.clone());
+        Ok(bind_group)
     }
 
     pub fn set_scale_factor(&mut self, new_factor: f32) {
@@ -405,12 +531,12 @@ impl<'a> Renderer<'a> {
         self.rect_dirty.clear();
         self.line_dirty.clear();
         self.circ_dirty.clear();
-
+        self.frame_image_draws.clear();
         self.rect_call_idx = 0;
         self.text_call_idx = 0;
     }
 
-    pub fn end_frame(&mut self) -> crate::Result<()> {
+    pub fn end_frame(&mut self) -> Result<()> {
         let dirty_items: Vec<(usize, RenderPrimative, Vec<RectId>)> = self
             .text_pool
             .iter()
@@ -492,6 +618,30 @@ impl<'a> Renderer<'a> {
             self.circle_ibuf.upload_one(&self.gpu.queue, idx, &inst);
         }
 
+        let image_instance_buffer: Option<wgpu::Buffer> = if !self.frame_image_draws.is_empty() {
+            let image_instances: Vec<RectInstance> = self
+                .frame_image_draws
+                .iter()
+                .map(|(rect, _)| RectInstance {
+                    pos: rect.origin.to_array(),
+                    size: rect.size.to_array(),
+                    ..Default::default()
+                })
+                .collect();
+
+            Some(
+                self.gpu
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("temp-image-instance-buf"),
+                        contents: bytemuck::cast_slice(&image_instances),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    }),
+            )
+        } else {
+            None
+        };
+
         let frame = self.surface.get_current_texture()?;
         let view = frame
             .texture
@@ -555,6 +705,16 @@ impl<'a> Renderer<'a> {
             rp.set_pipeline(&self.circle_pipe);
             rp.set_vertex_buffer(0, self.circle_ibuf.buf.slice(..));
             rp.draw(0..6, 0..self.circ_pool.len() as _);
+
+            if let Some(buffer) = &image_instance_buffer {
+                rp.set_pipeline(&self.image_pipe);
+                rp.set_vertex_buffer(0, buffer.slice(..));
+
+                for (i, (_, bind_group)) in self.frame_image_draws.iter().enumerate() {
+                    rp.set_bind_group(1, bind_group, &[]);
+                    rp.draw(0..6, i as u32..(i + 1) as u32);
+                }
+            }
         }
 
         self.gpu.queue.submit(Some(enc.finish()));

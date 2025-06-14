@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use wgpu::{Adapter, Device, Instance, Queue};
 
 pub struct GpuContext {
@@ -13,7 +14,7 @@ impl GpuContext {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions::default())
             .await
-            .ok_or("Failed to find adapter")?;
+            .ok_or_else(|| anyhow!("Failed to find adapter"))?;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor::default(), None)
             .await?;

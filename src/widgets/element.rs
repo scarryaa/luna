@@ -34,6 +34,16 @@ impl Element {
         self
     }
 
+    pub fn width(mut self, width: f32) -> Self {
+        self.style.width = Some(width);
+        self
+    }
+
+    pub fn height(mut self, height: f32) -> Self {
+        self.style.height = Some(height);
+        self
+    }
+
     pub fn padding(mut self, padding: f32) -> Self {
         self.style.padding = Vec2::splat(padding);
         self

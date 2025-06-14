@@ -1,4 +1,5 @@
 use super::GpuContext;
+use anyhow::Result;
 use wgpu::{Surface, SurfaceConfiguration, TextureFormat};
 
 pub struct RenderSurface<'window> {
@@ -7,7 +8,7 @@ pub struct RenderSurface<'window> {
 }
 
 impl<'window> RenderSurface<'window> {
-    pub fn new(gpu: &GpuContext, window: &'window winit::window::Window) -> crate::Result<Self> {
+    pub fn new(gpu: &GpuContext, window: &'window winit::window::Window) -> Result<Self> {
         let surface = gpu.instance.create_surface(window)?;
 
         let size = window.inner_size();

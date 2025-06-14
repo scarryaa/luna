@@ -73,6 +73,8 @@ pub struct Style {
     pub flex_grow: f32,
     pub padding: Vec2,
     pub background_color: Option<Vec4>,
+    pub width: Option<f32>,
+    pub height: Option<f32>,
 }
 
 impl Default for Style {
@@ -84,6 +86,8 @@ impl Default for Style {
             flex_grow: 0.0,
             padding: Vec2::ZERO,
             background_color: None,
+            width: None,
+            height: None,
         }
     }
 }

@@ -62,18 +62,27 @@ impl Node {
         }
 
         self.dirty.paint_dirty = true;
+        let style = self.widget.style();
 
         if self.dirty.self_dirty {
-            self.cached_size = self.widget.measure(max_width, theme);
+            let mut measured_size = self.widget.measure(max_width, theme);
+
+            if let Some(w) = style.width {
+                measured_size.x = w;
+            }
+            if let Some(h) = style.height {
+                measured_size.y = h;
+            }
+
+            self.cached_size = measured_size;
         }
 
         if self.children.is_empty() {
             self.dirty.self_dirty = false;
             self.dirty.child_dirty = false;
-            return self.cached_size;
+            return self.cached_size + style.padding_total();
         }
 
-        let style = self.widget.style();
         let avail = vec2(max_width, self.layout_rect.size.y) - style.padding_total();
 
         for child in &mut self.children {
@@ -92,7 +101,9 @@ impl Node {
                     child.set_rect(new_rect);
                     y += sz.y;
                 }
-                self.cached_size = vec2(max_width, y) + style.padding_total();
+                let content_width = self.cached_size.x.max(max_width);
+                let content_height = self.cached_size.y.max(y);
+                self.cached_size = vec2(content_width, content_height) + style.padding_total();
             }
             Display::Flex => {
                 let sz = crate::layout::flexbox::compute(
@@ -102,6 +113,12 @@ impl Node {
                     content_origin,
                 );
                 self.cached_size = sz + style.padding_total();
+                if let Some(w) = style.width {
+                    self.cached_size.x = w;
+                }
+                if let Some(h) = style.height {
+                    self.cached_size.y = h;
+                }
             }
             Display::Grid => {
                 let sz = crate::layout::grid::compute(
@@ -112,6 +129,12 @@ impl Node {
                     theme,
                 );
                 self.cached_size = sz + style.padding_total();
+                if let Some(w) = style.width {
+                    self.cached_size.x = w;
+                }
+                if let Some(h) = style.height {
+                    self.cached_size.y = h;
+                }
             }
         }
 

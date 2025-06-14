@@ -1,4 +1,4 @@
-use glam::{Vec2, vec2};
+use glam::{Vec2, Vec4, vec2};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Display {
@@ -72,6 +72,7 @@ pub struct Style {
     pub grid: Grid,
     pub flex_grow: f32,
     pub padding: Vec2,
+    pub background_color: Option<Vec4>,
 }
 
 impl Default for Style {
@@ -82,6 +83,7 @@ impl Default for Style {
             grid: Grid::default(),
             flex_grow: 0.0,
             padding: Vec2::ZERO,
+            background_color: None,
         }
     }
 }

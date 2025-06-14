@@ -8,11 +8,11 @@ pub mod text;
 pub mod widgets;
 pub mod windowing;
 
-pub use app::{App, AppBuilder};
+pub use app::App;
 pub use layout::LayoutNode;
 pub use renderer::Renderer;
 pub use style::Style;
-pub use widgets::{Button, Text, TextInput, Widget};
+pub use widgets::{Button, Element, Text, TextInput, Widget};
 pub use windowing::{Window, WindowBuilder};
 
 pub use glam::{Mat4, Vec2, Vec3, Vec4, vec2};

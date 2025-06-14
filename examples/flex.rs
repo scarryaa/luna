@@ -17,5 +17,6 @@ fn main() -> Result<()> {
     App::new(ui)
         .with_title("Flex Demo")
         .with_size(640, 120)
+        .with_theme(theme)
         .run()
 }

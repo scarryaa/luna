@@ -1,8 +1,8 @@
 use glam::{Vec2, vec2};
 
+use crate::Renderer;
 use crate::layout::node::Node;
 use crate::style::tokens::Spacing;
-use crate::{Renderer, layout::Rect};
 
 use super::{BuildCtx, Widget};
 
@@ -41,9 +41,9 @@ impl Widget for Column {
         vec2(w, h)
     }
 
-    fn paint(&mut self, children: &mut [Node], layout: Rect, ren: &mut Renderer) {
-        for child in children {
-            if child.layout_rect.intersects(&layout) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+        for child in &mut node.children {
+            if child.layout_rect.intersects(&node.layout_rect) {
                 child.collect(ren);
             }
         }

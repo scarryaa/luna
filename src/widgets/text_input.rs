@@ -135,7 +135,9 @@ impl Widget for TextInput {
         vec2(100.0, Typography::BODY + Spacing::MD * 2.0)
     }
 
-    fn paint(&mut self, _children: &mut [Node], layout: Rect, ren: &mut Renderer) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+        let layout = node.layout_rect;
+
         let bg_color = if self.focused {
             Vec4::from(Colour::PRIMARY_HOVER)
         } else {

@@ -46,10 +46,11 @@ impl Widget for Scrollable {
         }
     }
 
-    fn paint(&mut self, children: &mut [Node], layout: Rect, ren: &mut Renderer) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+        let layout = node.layout_rect;
         ren.push_scissor_rect(layout);
 
-        if let Some(child) = children.first_mut() {
+        if let Some(child) = node.children.first_mut() {
             self.child_size = child.cached();
 
             let child_pos = layout.origin - self.offset;

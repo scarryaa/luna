@@ -2,11 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use glam::Vec2;
 
-use crate::{
-    layout::{Rect, node::Node},
-    renderer::Renderer,
-    widgets::Widget,
-};
+use crate::{layout::node::Node, renderer::Renderer, widgets::Widget};
 
 #[derive(Clone)]
 pub struct Canvas {
@@ -30,7 +26,7 @@ impl Widget for Canvas {
         Vec2::ZERO
     }
 
-    fn paint(&mut self, _children: &mut [Node], _layout: Rect, ren: &mut Renderer) {
+    fn paint(&mut self, _node: &mut Node, ren: &mut Renderer) {
         (self.on_paint.borrow_mut())(ren);
     }
 }

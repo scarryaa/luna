@@ -1,7 +1,7 @@
+use crate::layout::node::Node;
 use glam::{Vec2, Vec4, vec2};
 
 use crate::{
-    layout::{Rect, node::Node},
     renderer::{RectId, Renderer, primatives::RectInstance},
     style::{Align, Display, FlexDir, Justify, Style},
     widgets::{BuildCtx, Widget},
@@ -89,22 +89,22 @@ impl Widget for Element {
         Vec2::ZERO
     }
 
-    fn paint(&mut self, children: &mut [Node], layout: Rect, ren: &mut Renderer) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
         if let Some(color) = self.style.background_color {
             let id = *self.bg_id.get_or_insert_with(|| ren.alloc_rect());
             ren.update_rect(
                 id,
                 RectInstance {
-                    pos: layout.origin.to_array(),
-                    size: layout.size.to_array(),
+                    pos: node.layout_rect.origin.to_array(),
+                    size: node.layout_rect.size.to_array(),
                     color: color.to_array(),
                     ..Default::default()
                 },
             );
         }
 
-        for child in children {
-            if child.layout_rect.intersects(&layout) {
+        for child in &mut node.children {
+            if child.layout_rect.intersects(&node.layout_rect) {
                 child.collect(ren);
             }
         }

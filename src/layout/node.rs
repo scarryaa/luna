@@ -1,3 +1,5 @@
+use std::mem;
+
 use glam::{Vec2, vec2};
 use winit::event::{ElementState, Ime, MouseScrollDelta, WindowEvent};
 
@@ -21,7 +23,7 @@ pub enum PrimId {
 pub struct Node {
     pub id: NodeId,
     pub widget: Box<dyn Widget>,
-    children: Vec<Node>,
+    pub children: Vec<Node>,
 
     pub layout_rect: Rect,
     pub cached_size: Vec2,
@@ -119,14 +121,16 @@ impl Node {
     pub fn collect(&mut self, ren: &mut Renderer) {
         let _guard = ScopedNodeContext::new(self.id);
 
-        if self.dirty.paint_dirty {
-            self.widget.paint(&mut self.children, self.layout_rect, ren);
-            self.dirty.paint_dirty = false;
-        } else {
-            for child in &mut self.children {
-                child.collect(ren);
-            }
-        }
+        let mut widget = mem::replace(
+            &mut self.widget,
+            Box::new(crate::widgets::Element::default()),
+        );
+
+        widget.paint(self, ren);
+
+        self.widget = widget;
+
+        self.dirty.paint_dirty = false;
     }
 
     pub fn mark_dirty_by_id(&mut self, target_id: NodeId) -> bool {

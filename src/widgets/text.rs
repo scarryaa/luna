@@ -1,7 +1,7 @@
 use glam::{Vec2, Vec4, vec2};
 
 use crate::{
-    layout::{Rect, node::Node},
+    layout::node::Node,
     renderer::Renderer,
     signals::ReadSignal,
     style::tokens::{Colour, Typography},
@@ -33,7 +33,12 @@ impl Widget for Text {
         vec2(content_str.len() as f32 * self.size * 0.6, self.size)
     }
 
-    fn paint(&mut self, _children: &mut [Node], layout: Rect, ren: &mut Renderer) {
-        ren.draw_text(&self.content.get(), layout.origin, self.color, self.size);
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+        ren.draw_text(
+            &self.content.get(),
+            node.layout_rect.origin,
+            self.color,
+            self.size,
+        );
     }
 }

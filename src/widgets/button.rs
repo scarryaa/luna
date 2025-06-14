@@ -1,3 +1,4 @@
+use crate::layout::node::Node;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -8,7 +9,7 @@ use super::base::Widget;
 use crate::signals::{ReadSignal, create_signal};
 use crate::{
     Renderer,
-    layout::{Rect, node::Node},
+    layout::Rect,
     renderer::{RectId, RenderPrimative, primatives::RectInstance},
     style::tokens::{Colour, Radius, Spacing, Typography},
     windowing::events::{EventCtx, EventKind, Phase},
@@ -61,7 +62,9 @@ impl Widget for Button {
         )
     }
 
-    fn paint(&mut self, _children: &mut [Node], layout: Rect, ren: &mut Renderer) {
+    fn paint(&mut self, node: &mut Node, ren: &mut Renderer) {
+        let layout = node.layout_rect;
+
         let bg_color = if self.hovered {
             Vec4::from(Colour::PRIMARY_HOVER)
         } else {

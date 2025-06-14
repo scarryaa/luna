@@ -35,6 +35,7 @@ pub struct Flex {
     pub justify: Justify,
     pub align: Align,
     pub gap: f32,
+    pub fill_cross: bool,
 }
 
 impl Default for Flex {
@@ -44,6 +45,7 @@ impl Default for Flex {
             justify: Justify::Start,
             align: Align::Stretch,
             gap: 0.0,
+            fill_cross: false,
         }
     }
 }

@@ -104,7 +104,8 @@ impl App {
                     event: WindowEvent::RedrawRequested,
                 } if *window_id == window.id() => {
                     renderer.begin_frame();
-                    root.layout(win_width, &self.theme);
+
+                    root.layout(win_width, &self.theme, renderer.font_system());
                     root.collect(&mut renderer, &self.theme);
 
                     if let Err(e) = renderer.end_frame() {
@@ -125,7 +126,8 @@ impl App {
                                 vec2(sz.width as f32, sz.height as f32),
                             ));
                             root.mark_dirty();
-                            root.layout(sz.width as f32, &self.theme);
+
+                            root.layout(sz.width as f32, &self.theme, renderer.font_system());
                         }
                         _ => {}
                     }

@@ -10,7 +10,12 @@ pub trait Widget: WidgetClone {
         Vec::new()
     }
 
-    fn measure(&self, max_width: f32, theme: &Theme) -> Vec2;
+    fn measure(
+        &self,
+        max_width: f32,
+        theme: &Theme,
+        font_system: &mut cosmic_text::FontSystem,
+    ) -> Vec2;
 
     fn paint(&mut self, node: &mut Node, ren: &mut Renderer, theme: &Theme);
 

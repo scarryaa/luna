@@ -2,6 +2,7 @@ use crate::layout::node::Node;
 use crate::style::Theme;
 use std::rc::Rc;
 
+use cosmic_text::{Attrs, Buffer, Metrics, Shaping};
 use glam::{Vec2, Vec4, vec2};
 use winit::event::MouseButton;
 
@@ -46,10 +47,25 @@ impl Button {
 }
 
 impl Widget for Button {
-    fn measure(&self, _max_width: f32, theme: &Theme) -> Vec2 {
+    fn measure(
+        &self,
+        _max_width: f32,
+        theme: &Theme,
+        font_system: &mut cosmic_text::FontSystem,
+    ) -> Vec2 {
         let text = self.label.get();
-        // TODO measure this accurately
-        let text_w = text.len() as f32 * 0.6 * theme.typography.body;
+        let size = theme.typography.body;
+        let metrics = Metrics::new(size, size * 1.2);
+
+        let mut text_buffer = Buffer::new(font_system, metrics);
+        let mut buffer_mut = text_buffer.borrow_with(font_system);
+        buffer_mut.set_text(&text, &Attrs::new(), Shaping::Advanced);
+        buffer_mut.shape_until_scroll(true);
+        let text_w = buffer_mut
+            .layout_runs()
+            .next()
+            .map_or(0.0, |run| run.line_w);
+
         vec2(
             text_w + theme.spacing.md * 2.0,
             theme.typography.body + theme.spacing.sm * 2.0,

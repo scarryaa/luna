@@ -30,7 +30,12 @@ impl Widget for Scrollable {
         vec![self.child.clone()]
     }
 
-    fn measure(&self, max_width: f32, _theme: &Theme) -> Vec2 {
+    fn measure(
+        &self,
+        max_width: f32,
+        _theme: &Theme,
+        _font_system: &mut cosmic_text::FontSystem,
+    ) -> Vec2 {
         vec2(max_width, f32::INFINITY)
     }
 
@@ -57,7 +62,7 @@ impl Widget for Scrollable {
             let child_pos = layout.origin - self.offset;
             child.set_rect(Rect::new(child_pos, self.child_size));
 
-            child.layout(layout.size.x, theme);
+            child.layout(layout.size.x, theme, ren.font_system());
             child.collect(ren, theme);
         }
 

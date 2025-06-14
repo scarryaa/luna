@@ -24,12 +24,17 @@ impl Widget for Column {
         self.children.iter().map(|w| w.box_clone()).collect()
     }
 
-    fn measure(&self, max_width: f32, theme: &Theme) -> Vec2 {
+    fn measure(
+        &self,
+        max_width: f32,
+        theme: &Theme,
+        font_system: &mut cosmic_text::FontSystem,
+    ) -> Vec2 {
         let mut w: f32 = 0.0;
         let mut h = 0.0;
 
         for (i, child) in self.children.iter().enumerate() {
-            let sz = child.measure(max_width, theme);
+            let sz = child.measure(max_width, theme, font_system);
             w = w.max(sz.x);
             h += sz.y;
 

@@ -129,7 +129,12 @@ impl Widget for TextInput {
         }
     }
 
-    fn measure(&self, _max_width: f32, theme: &Theme) -> Vec2 {
+    fn measure(
+        &self,
+        _max_width: f32,
+        theme: &Theme,
+        _font_system: &mut cosmic_text::FontSystem,
+    ) -> Vec2 {
         vec2(100.0, theme.typography.body + theme.spacing.md * 2.0)
     }
 

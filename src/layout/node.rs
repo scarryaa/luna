@@ -1,5 +1,6 @@
 use std::mem;
 
+use cosmic_text::FontSystem;
 use glam::{Vec2, vec2};
 use winit::event::{ElementState, Ime, MouseScrollDelta, WindowEvent};
 
@@ -46,7 +47,7 @@ impl Node {
             widget,
             children: kids,
             layout_rect: layout,
-            cached_size: layout.size,
+            cached_size: Vec2::ZERO,
             dirty: Dirty {
                 self_dirty: true,
                 child_dirty: true,
@@ -56,87 +57,74 @@ impl Node {
         }
     }
 
-    pub fn layout(&mut self, max_width: f32, theme: &Theme) -> Vec2 {
+    pub fn layout(&mut self, max_width: f32, theme: &Theme, font_system: &mut FontSystem) -> Vec2 {
         if !self.dirty.self_dirty && !self.dirty.child_dirty {
             return self.cached_size;
         }
 
         self.dirty.paint_dirty = true;
         let style = self.widget.style();
+        let padding_size = style.padding_total();
 
-        if self.dirty.self_dirty {
-            let mut measured_size = self.widget.measure(max_width, theme);
+        let content_size: Vec2;
 
-            if let Some(w) = style.width {
-                measured_size.x = w;
+        if !self.children.is_empty() {
+            let child_max_width = if let Some(w) = style.width {
+                w - padding_size.x
+            } else {
+                max_width - padding_size.x
+            };
+            for child in &mut self.children {
+                child.layout(child_max_width, theme, font_system);
             }
-            if let Some(h) = style.height {
-                measured_size.y = h;
-            }
 
-            self.cached_size = measured_size;
-        }
+            let avail = vec2(max_width, self.layout_rect.size.y) - padding_size;
+            let content_origin = self.layout_rect.origin + style.padding_tl();
 
-        if self.children.is_empty() {
-            self.dirty.self_dirty = false;
-            self.dirty.child_dirty = false;
-            return self.cached_size + style.padding_total();
-        }
-
-        let avail = vec2(max_width, self.layout_rect.size.y) - style.padding_total();
-
-        for child in &mut self.children {
-            child.layout(avail.x, theme);
-        }
-
-        let content_origin = self.layout_rect.origin + style.padding_tl();
-
-        match style.display {
-            Display::Block => {
-                let mut y = style.padding.y;
-                for child in &mut self.children {
-                    let sz = child.cached();
-                    let new_rect =
-                        Rect::new(self.layout_rect.origin + vec2(style.padding.x, y), sz);
-                    child.set_rect(new_rect);
-                    y += sz.y;
-                }
-                let content_width = self.cached_size.x.max(max_width);
-                let content_height = self.cached_size.y.max(y);
-                self.cached_size = vec2(content_width, content_height) + style.padding_total();
-            }
-            Display::Flex => {
-                let sz = crate::layout::flexbox::compute(
+            content_size = match style.display {
+                Display::Flex => crate::layout::flexbox::compute(
                     style.flex,
                     &mut self.children,
                     avail,
                     content_origin,
-                );
-                self.cached_size = sz + style.padding_total();
-                if let Some(w) = style.width {
-                    self.cached_size.x = w;
-                }
-                if let Some(h) = style.height {
-                    self.cached_size.y = h;
-                }
-            }
-            Display::Grid => {
-                let sz = crate::layout::grid::compute(
+                ),
+                Display::Grid => crate::layout::grid::compute(
                     style.grid,
                     &mut self.children,
                     avail,
                     content_origin,
                     theme,
-                );
-                self.cached_size = sz + style.padding_total();
-                if let Some(w) = style.width {
-                    self.cached_size.x = w;
+                    font_system,
+                ),
+                Display::Block => {
+                    let mut y = 0.0;
+                    let mut max_x: f32 = 0.0;
+                    for child in &mut self.children {
+                        let sz = child.cached();
+                        let new_rect = Rect::new(content_origin + vec2(0.0, y), sz);
+                        child.set_rect(new_rect);
+                        y += sz.y;
+                        max_x = max_x.max(sz.x);
+                    }
+                    vec2(max_x, y)
                 }
-                if let Some(h) = style.height {
-                    self.cached_size.y = h;
-                }
-            }
+            };
+        } else {
+            content_size = self
+                .widget
+                .measure(max_width - padding_size.x, theme, font_system);
         }
+
+        let mut final_size = content_size + padding_size;
+
+        if let Some(w) = style.width {
+            final_size.x = w;
+        }
+        if let Some(h) = style.height {
+            final_size.y = h;
+        }
+
+        self.cached_size = final_size;
 
         self.dirty.self_dirty = false;
         self.dirty.child_dirty = false;
@@ -152,8 +140,8 @@ impl Node {
         );
 
         widget.paint(self, ren, theme);
-        self.widget = widget;
 
+        self.widget = widget;
         self.dirty.paint_dirty = false;
     }
 

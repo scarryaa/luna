@@ -22,7 +22,12 @@ impl Widget for Canvas {
         Vec::new()
     }
 
-    fn measure(&self, _max_width: f32, _theme: &Theme) -> Vec2 {
+    fn measure(
+        &self,
+        _max_width: f32,
+        _theme: &Theme,
+        _font_system: &mut cosmic_text::FontSystem,
+    ) -> Vec2 {
         Vec2::ZERO
     }
 

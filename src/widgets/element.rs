@@ -19,6 +19,11 @@ impl Element {
         Self::default()
     }
 
+    pub fn fill_cross(mut self, v: bool) -> Self {
+        self.style.flex.fill_cross = v;
+        self
+    }
+
     pub fn child(mut self, widget: impl Widget + 'static) -> Self {
         self.children.push(Box::new(widget));
         self
@@ -95,7 +100,12 @@ impl Widget for Element {
         self.style
     }
 
-    fn measure(&self, _max_width: f32, _theme: &Theme) -> Vec2 {
+    fn measure(
+        &self,
+        _max_width: f32,
+        _theme: &Theme,
+        _font_system: &mut cosmic_text::FontSystem,
+    ) -> Vec2 {
         Vec2::ZERO
     }
 

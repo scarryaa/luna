@@ -1,8 +1,9 @@
 use glam::{Vec2, Vec4, vec2};
 
 use crate::{
-    Renderer,
     layout::{Rect, node::Node},
+    renderer::Renderer,
+    signals::ReadSignal,
     style::tokens::{Colour, Typography},
 };
 
@@ -10,15 +11,16 @@ use super::base::Widget;
 
 #[derive(Clone)]
 pub struct Text {
-    pub content: String,
+    pub content: ReadSignal<String>,
     pub color: Vec4,
     pub size: f32,
 }
 
-impl Default for Text {
-    fn default() -> Self {
+impl Text {
+    pub fn new(content: impl Into<String>) -> Self {
+        let (read, _) = crate::signals::create_signal(content.into());
         Self {
-            content: String::new(),
+            content: read,
             color: Vec4::from(Colour::TEXT),
             size: Typography::BODY,
         }
@@ -27,10 +29,11 @@ impl Default for Text {
 
 impl Widget for Text {
     fn measure(&self, _max_width: f32) -> Vec2 {
-        vec2(self.content.len() as f32 * self.size * 0.6, self.size)
+        let content_str = self.content.get();
+        vec2(content_str.len() as f32 * self.size * 0.6, self.size)
     }
 
     fn paint(&mut self, _children: &mut [Node], layout: Rect, ren: &mut Renderer) {
-        ren.draw_text(&self.content, layout.origin, self.color, self.size);
+        ren.draw_text(&self.content.get(), layout.origin, self.color, self.size);
     }
 }

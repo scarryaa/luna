@@ -1,4 +1,4 @@
-use glam::{Vec2, Vec4};
+use glam::{Vec2, Vec4, vec2};
 
 use crate::{
     layout::{Rect, node::Node},
@@ -21,6 +21,11 @@ impl Element {
 
     pub fn child(mut self, widget: impl Widget + 'static) -> Self {
         self.children.push(Box::new(widget));
+        self
+    }
+
+    pub fn children(mut self, widgets: impl IntoIterator<Item = Box<dyn Widget>>) -> Self {
+        self.children.extend(widgets);
         self
     }
 
@@ -54,9 +59,19 @@ impl Element {
         self
     }
 
+    pub fn grid_cols(mut self, cols: u16) -> Self {
+        self.style.grid.cols = cols;
+        self
+    }
+
+    pub fn grid_row_height(mut self, height: f32) -> Self {
+        self.style.grid.row_height = height;
+        self
+    }
+
     pub fn gap(mut self, gap: f32) -> Self {
         self.style.flex.gap = gap;
-        self.style.grid.gap = Vec2::splat(gap);
+        self.style.grid.gap = vec2(gap, gap);
         self
     }
 }

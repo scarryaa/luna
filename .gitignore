@@ -1,3 +1,4 @@
 /target
 *.jj
 combine_rs.sh
+*.DS_Store
